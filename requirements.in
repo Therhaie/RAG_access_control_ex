@@ -1,0 +1,16 @@
+langchain
+vllm
+langchain_community
+langchain_chroma
+langchain_openai
+chromadb
+openai
+sentence_transformers
+matplotlib
+pandas
+seaborn
+scikit-learn
+umap-learn
+notebook
+plotly
+datasets

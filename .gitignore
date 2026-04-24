@@ -1,0 +1,12 @@
+__pycache__/
+chroma_extra_dim_experiment/
+chroma_meta_db_experiment/
+chroma_rotated_db_log/
+experiment_chroma_db/
+logs/
+plots/
+RAGBench_whole/*.json
+results_experiment_extra_dim/
+venv/
+
+
