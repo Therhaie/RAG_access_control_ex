@@ -525,332 +525,414 @@ def fetch_chunk(
     return None, None
 
 
-def _build_aug_db_all_untargeted_chunks_parallel(
-    gt_records: List[Dict],
-    cfg: ExtraDimConfig,
-    orig_collection,
-    aug_collection,
-    verbose: bool = True,
-) -> None:
-    """
-    Thread-based parallel addition of untargeted chunks to the augmented DB.
-    """
-    # Get all chunk IDs and targeted chunk IDs
-    list_of_chunk_ids = get_all_chunk_ids(gt_records)
-    list_of_targeted_chunk_ids = get_list_id_targeted_chunk(gt_records)
-    untargeted_chunks = [chunk_id for chunk_id in list_of_chunk_ids if chunk_id not in list_of_targeted_chunk_ids]
-    print(f"Found {len(untargeted_chunks)} untargeted chunks to add to the augmented DB.")
+# def _build_aug_db_all_untargeted_chunks_parallel(
+#     gt_records: List[Dict],
+#     cfg: ExtraDimConfig,
+#     orig_collection,
+#     aug_collection,
+#     verbose: bool = True,
+# ) -> None:
+#     """
+#     Thread-based parallel addition of untargeted chunks to the augmented DB.
+#     """
+#     # Get all chunk IDs and targeted chunk IDs
+#     list_of_chunk_ids = get_all_chunk_ids(gt_records)
+#     list_of_targeted_chunk_ids = get_list_id_targeted_chunk(gt_records)
+#     untargeted_chunks = [chunk_id for chunk_id in list_of_chunk_ids if chunk_id not in list_of_targeted_chunk_ids]
+#     print(f"Found {len(untargeted_chunks)} untargeted chunks to add to the augmented DB.")
 
-    # Split untargeted_chunks into batches for parallel processing
-    batch_size = 100  # Adjust based on your system's capabilities
-    batches = [untargeted_chunks[i:i + batch_size] for i in range(0, len(untargeted_chunks), batch_size)]
+#     # Split untargeted_chunks into batches for parallel processing
+#     batch_size = 100  # Adjust based on your system's capabilities
+#     batches = [untargeted_chunks[i:i + batch_size] for i in range(0, len(untargeted_chunks), batch_size)]
 
-    def process_batch(batch: List[str]):
-        n_ok = 0
-        for chunk_id in batch:
-            tid, did, pseq = chunk_id.split("|")[0], chunk_id.split("|")[1], chunk_id.split("|")[2]
-            cid = f"{cfg.config_id}_{chunk_id}"
+#     def process_batch(batch: List[str]):
+#         n_ok = 0
+#         for chunk_id in batch:
+#             # tid, did, pseq = chunk_id.split("|")[0], chunk_id.split("|")[1], chunk_id.split("|")[2]
+#             tid, did, pseq = chunk_id.split("|")
 
-            base_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
-            if base_vec is None:
-                continue
+#             cid = f"{cfg.config_id}_{chunk_id}"
 
-            aug_vec = augment_chunk(base_vec, cfg, query_index=None, untargeted=True)
-            aug_collection.upsert(
-                ids=[cid],
-                embeddings=[aug_vec.tolist()],
-                documents=[content or ""],
-                metadatas=[{
-                    "triplet_index": tid,
-                    "document_id": did,
-                    "phrase_seq": pseq,
-                    "query_index": None,
-                    "config_id": cfg.config_id,
-                    "restricted": False,
-                }],
-            )
-            n_ok += 1
-        return n_ok
+#             base_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
+#             if base_vec is None:
+#                 continue
 
-    # Use ThreadPoolExecutor for I/O-bound tasks
-    total_ok = 0
-    with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(process_batch, batch) for batch in batches]
-        for future in as_completed(futures):
-            total_ok += future.result()
+#             aug_vec = augment_chunk(base_vec, cfg, query_index=None, untargeted=True)
+#             aug_collection.upsert(
+#                 ids=[cid],
+#                 embeddings=[aug_vec.tolist()],
+#                 documents=[content or ""],
+#                 metadatas=[{
+#                     "triplet_index": tid,
+#                     "document_id": did,
+#                     "phrase_seq": pseq,
+#                     "query_index": None,
+#                     "config_id": cfg.config_id,
+#                     "restricted": False,
+#                 }],
+#             )
+#             n_ok += 1
+#         return n_ok
 
-    if verbose:
-        print(f"Added {total_ok} untargeted chunks to the augmented DB.")
+#     # Use ThreadPoolExecutor for I/O-bound tasks
+#     total_ok = 0
+#     with ThreadPoolExecutor() as executor:
+#         futures = [executor.submit(process_batch, batch) for batch in batches]
+#         for future in as_completed(futures):
+#             total_ok += future.result()
 
-def _build_aug_record(
-    record: Dict,
-    query_index: int,
-    cfg: ExtraDimConfig,
-    orig_collection,
-    aug_collection,
-) -> int:
-    """
-    Thread-safe helper to build augmented chunks for a single record.
-    """
-    triplet_index = record["id_triplets"]
-    stable_chunks = record["targeted_chunk"]
-    n_ok = 0
+#     if verbose:
+#         print(f"Added {total_ok} untargeted chunks to the augmented DB.")
 
-    for chunk_id in stable_chunks:
-        tid, did, pseq = chunk_id.split("|")[0], chunk_id[-2], chunk_id[-1]
-        cid = f"{cfg.config_id}_{triplet_index}_{did}_{pseq}"
+# def _build_aug_record(
+#     record: Dict,
+#     query_index: int,
+#     cfg: ExtraDimConfig,
+#     orig_collection,
+#     aug_collection,
+# ) -> int:
+#     """
+#     Thread-safe helper to build augmented chunks for a single record.
+#     """
+#     triplet_index = record["id_triplets"]
+#     stable_chunks = record["targeted_chunk"]
+#     n_ok = 0
 
-        base_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
-        if base_vec is None:
-            continue
+#     for chunk_id in stable_chunks:
+#         # tid, did, pseq = chunk_id.split("|")[0], chunk_id[-2], chunk_id[-1]
+#         tid, did, pseq = chunk_id.split("|")
+#         cid = f"{cfg.config_id}_{triplet_index}_{did}_{pseq}"
 
-        aug_vec = augment_chunk(base_vec, cfg, query_index=query_index)
-        aug_collection.upsert(
-            ids=[cid],
-            embeddings=[aug_vec.tolist()],
-            documents=[content or ""],
-            metadatas=[{
-                "triplet_index": triplet_index,
-                "document_id": did,
-                "phrase_seq": pseq,
-                "query_index": query_index,
-                "config_id": cfg.config_id,
-                "restricted": True,
-            }],
-        )
-        n_ok += 1
+#         base_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
+#         if base_vec is None:
+#             continue
 
-    return n_ok
+#         aug_vec = augment_chunk(base_vec, cfg, query_index=query_index)
+#         aug_collection.upsert(
+#             ids=[cid],
+#             embeddings=[aug_vec.tolist()],
+#             documents=[content or ""],
+#             metadatas=[{
+#                 "triplet_index": triplet_index,
+#                 "document_id": did,
+#                 "phrase_seq": pseq,
+#                 "query_index": query_index,
+#                 "config_id": cfg.config_id,
+#                 "restricted": True,
+#             }],
+#         )
+#         n_ok += 1
 
-def build_aug_db_parallel(
-    gt_records: List[Dict],
-    cfg: ExtraDimConfig,
-    orig_collection,
-    aug_collection,
-    verbose: bool = True,
-) -> None:
-    """
-    Thread-based parallel construction of the augmented DB.
-    """
-    print(f"\n{'─' * 60}\n  Phase 1a — Building augmented DB (parallel with threads)\n{'─' * 60}")
+#     return n_ok
 
-    # Use ThreadPoolExecutor for I/O-bound tasks
-    with ThreadPoolExecutor() as executor:
-        futures = []
-        for i, record in enumerate(gt_records):
-            triplet_index = record.get("id_triplets")
-            if not triplet_index or not record.get("targeted_chunk"):
-                continue
-            futures.append(
-                executor.submit(
-                    _build_aug_record,
-                    record,
-                    i % NUMBER_CLUSTER,
-                    cfg,
-                    orig_collection,
-                    aug_collection,
-                )
-            )
+# def build_aug_db_parallel(
+#     gt_records: List[Dict],
+#     cfg: ExtraDimConfig,
+#     orig_collection,
+#     aug_collection,
+#     verbose: bool = True,
+# ) -> None:
+#     """
+#     Thread-based parallel construction of the augmented DB.
+#     """
+#     print(f"\n{'─' * 60}\n  Phase 1a — Building augmented DB (parallel with threads)\n{'─' * 60}")
 
-        # Wait for all tasks to complete
-        for future in as_completed(futures):
-            future.result()  # Raises exceptions if any
+#     # Use ThreadPoolExecutor for I/O-bound tasks
+#     with ThreadPoolExecutor() as executor:
+#         futures = []
+#         for i, record in enumerate(gt_records):
+#             triplet_index = record.get("id_triplets")
+#             if not triplet_index or not record.get("targeted_chunk"):
+#                 continue
+#             futures.append(
+#                 executor.submit(
+#                     _build_aug_record,
+#                     record,
+#                     i % NUMBER_CLUSTER,
+#                     cfg,
+#                     orig_collection,
+#                     aug_collection,
+#                 )
+#             )
 
-    print(f"\n  ✅ Augmented DB build complete (parallel with threads)")
+#         # Wait for all tasks to complete
+#         for future in as_completed(futures):
+#             future.result()  # Raises exceptions if any
 
-
-
-
-def _build_meta_record(
-    record: Dict,
-    orig_collection,
-    meta_collection,
-) -> int:
-    """
-    Thread-safe helper to build metadata for a single record.
-    """
-    triplet_index = record["id_triplets"]
-    stable_chunks = record["targeted_chunk"]
-    # stable_chunks = record.get("targeted_chunk", [])
-    n_ok = 0
-
-    for chunk_id in stable_chunks:
-        try:
-            tid, did, pseq = chunk_id.split("|")[0], chunk_id[-2], chunk_id[-1]
-            cid = f"meta_{triplet_index}_{did}_{pseq}"
-
-            base_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
-            if base_vec is None:
-                continue
-
-            meta_collection.upsert(
-                ids=[cid],
-                embeddings=[base_vec.tolist()],
-                documents=[content or ""],
-                metadatas=[{
-                    "triplet_index": triplet_index,
-                    "document_id": did,
-                    "phrase_seq": pseq,
-                    "restricted": f"{triplet_index}_True",
-                }],
-            )
-            n_ok += 1
-        except Exception as e:
-            warnings.warn(f"Failed to process chunk {chunk_id}: {e}")
-            continue
-
-    return n_ok
-
-def build_meta_db_parallel(
-    gt_records: List[Dict],
-    orig_collection,
-    meta_collection,
-    verbose: bool = True,
-) -> None:
-    """
-    Thread-based parallel construction of the metadata database.
-    """
-    print(f"\n{'─' * 60}\n  Phase 1b — Building metadata DB (parallel with threads)\n{'─' * 60}")
-
-    # Use ThreadPoolExecutor for I/O-bound tasks
-    with ThreadPoolExecutor() as executor:
-        futures = []
-        for record in gt_records:
-            if not record.get("id_triplets") or not record.get("targeted_chunk"):
-                continue
-            futures.append(
-                executor.submit(
-                    _build_meta_record,
-                    record,
-                    orig_collection,
-                    meta_collection,
-                )
-            )
-
-        # Wait for all tasks to complete
-        for future in as_completed(futures):
-            future.result()
-
-    print(f"\n  ✅ Metadata DB build complete (parallel with threads)")
-
-def build_meta_db_add_untargeted_chunks_parallel(
-    gt_records: List[Dict],
-    orig_collection,
-    meta_collection,
-    verbose: bool = True,
-) -> None:
-    """
-    Thread-based parallel addition of untargeted chunks to the metadata DB.
-    """
-    # Get all chunk IDs and targeted chunk IDs
-    list_of_chunk_ids = get_all_chunk_ids(gt_records)
-    list_of_targeted_chunk_ids = get_list_id_targeted_chunk(gt_records)
-    untargeted_chunks = [chunk_id for chunk_id in list_of_chunk_ids if chunk_id not in list_of_targeted_chunk_ids]
-
-    # Split untargeted_chunks into batches for parallel processing
-    batch_size = 100  # Adjust based on your system's capabilities
-    batches = [untargeted_chunks[i:i + batch_size] for i in range(0, len(untargeted_chunks), batch_size)]
-
-    def process_batch(batch: List[str]):
-        n_ok = 0
-        for chunk_id in batch:
-            tid, did, pseq = chunk_id.split("|")[0], chunk_id.split("|")[1], chunk_id.split("|")[2]
-            cid = f"{tid}_{did}_{pseq}"
-
-            base_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
-            if base_vec is None:
-                continue
-
-            meta_collection.upsert(
-                ids=[cid],
-                embeddings=[base_vec.tolist()],
-                documents=[content or ""],
-                metadatas=[{
-                    "triplet_index": tid,
-                    "document_id": did,
-                    "phrase_seq": pseq,
-                    "restricted": False,
-                }],
-            )
-            n_ok += 1
-        return n_ok
-
-    # Use ThreadPoolExecutor for I/O-bound tasks
-    total_ok = 0
-    with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(process_batch, batch) for batch in batches]
-        for future in as_completed(futures):
-            total_ok += future.result()
-
-    if verbose:
-        print(f"Added {total_ok} untargeted chunks to the metadata DB.")
+#     print(f"\n  ✅ Augmented DB build complete (parallel with threads)")
 
 
 
-@timed("build_rotated_db_untargeted_chunks")
-def _build_rotated_db_untargeted_chunks_parallel(
-    gt_records: list[dict],
-    registry: RotationRegistry,
-    orig_collection,
-    rot_collection,
-    verbose: bool = True,
-) -> int:
-    """Thread-based parallel addition of untargeted chunks to the rotated DB."""
-    # Get all chunk IDs and targeted chunk IDs
-    list_of_chunk_ids = get_all_chunk_ids(gt_records)
-    list_of_targeted_chunk_ids = get_list_id_targeted_chunk(gt_records)
-    untargeted_chunks = [chunk_id for chunk_id in list_of_chunk_ids if chunk_id not in list_of_targeted_chunk_ids]
 
-    # Split into batches for parallel processing
-    batch_size = 100  # Adjust based on system capabilities
-    batches = [untargeted_chunks[i:i + batch_size] for i in range(0, len(untargeted_chunks), batch_size)]
+# def _build_meta_record(
+#     record: Dict,
+#     orig_collection,
+#     meta_collection,
+# ) -> int:
+#     """
+#     Thread-safe helper to build metadata for a single record.
+#     """
+#     triplet_index = record["id_triplets"]
+#     stable_chunks = record["targeted_chunk"]
+#     # stable_chunks = record.get("targeted_chunk", [])
+#     n_ok = 0
 
-    def process_batch(batch: list[str]):
-        n_ok = 0
-        for chunk_id in batch:
-            tid, did, pseq = chunk_id.split("|")[0], chunk_id.split("|")[1], chunk_id.split("|")[2]
-            cid = f"{tid}_{did}_{pseq}"
+#     for chunk_id in stable_chunks:
+#         try:
+#             # tid, did, pseq = chunk_id.split("|")[0], chunk_id[-2], chunk_id[-1]
+#             tid, did, pseq = chunk_id.split("|")
 
-            orig_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
-            if orig_vec is None:
-                continue
+#             cid = f"meta_{triplet_index}_{did}_{pseq}"
 
-            rot_collection.upsert(
-                ids=[cid],
-                embeddings=[orig_vec.tolist()],
-                documents=[content or ""],
-                metadatas=[{
-                    "triplet_index": tid,
-                    "document_id": did,
-                    "phrase_seq": pseq,
-                    "rotation_seed": None,
-                }],
-            )
-            n_ok += 1
-            if verbose:
-                print(f" untargeted chunk added {chunk_id} → {cid}")
-        return n_ok
+#             base_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
+#             if base_vec is None:
+#                 continue
 
-    # Use ThreadPoolExecutor for I/O-bound tasks
-    total_ok = 0
-    with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(process_batch, batch) for batch in batches]
-        for future in as_completed(futures):
-            total_ok += future.result()
+#             meta_collection.upsert(
+#                 ids=[cid],
+#                 embeddings=[base_vec.tolist()],
+#                 documents=[content or ""],
+#                 metadatas=[{
+#                     "triplet_index": triplet_index,
+#                     "document_id": did,
+#                     "phrase_seq": pseq,
+#                     "restricted": f"{triplet_index}_True",
+#                 }],
+#             )
+#             n_ok += 1
+#         except Exception as e:
+#             warnings.warn(f"Failed to process chunk {chunk_id}: {e}")
+#             continue
 
-    return total_ok
+#     return n_ok
+
+# def build_meta_db_parallel(
+#     gt_records: List[Dict],
+#     orig_collection,
+#     meta_collection,
+#     verbose: bool = True,
+# ) -> None:
+#     """
+#     Thread-based parallel construction of the metadata database.
+#     """
+#     print(f"\n{'─' * 60}\n  Phase 1b — Building metadata DB (parallel with threads)\n{'─' * 60}")
+
+#     # Use ThreadPoolExecutor for I/O-bound tasks
+#     with ThreadPoolExecutor() as executor:
+#         futures = []
+#         for record in gt_records:
+#             if not record.get("id_triplets") or not record.get("targeted_chunk"):
+#                 continue
+#             futures.append(
+#                 executor.submit(
+#                     _build_meta_record,
+#                     record,
+#                     orig_collection,
+#                     meta_collection,
+#                 )
+#             )
+
+#         # Wait for all tasks to complete
+#         for future in as_completed(futures):
+#             future.result()
+
+#     print(f"\n  ✅ Metadata DB build complete (parallel with threads)")
+
+# def build_meta_db_add_untargeted_chunks_parallel(
+#     gt_records: List[Dict],
+#     orig_collection,
+#     meta_collection,
+#     verbose: bool = True,
+# ) -> None:
+#     """
+#     Thread-based parallel addition of untargeted chunks to the metadata DB.
+#     """
+#     # Get all chunk IDs and targeted chunk IDs
+#     list_of_chunk_ids = get_all_chunk_ids(gt_records)
+#     list_of_targeted_chunk_ids = get_list_id_targeted_chunk(gt_records)
+#     untargeted_chunks = [chunk_id for chunk_id in list_of_chunk_ids if chunk_id not in list_of_targeted_chunk_ids]
+
+#     # Split untargeted_chunks into batches for parallel processing
+#     batch_size = 100  # Adjust based on your system's capabilities
+#     batches = [untargeted_chunks[i:i + batch_size] for i in range(0, len(untargeted_chunks), batch_size)]
+
+#     def process_batch(batch: List[str]):
+#         n_ok = 0
+#         for chunk_id in batch:
+#             # tid, did, pseq = chunk_id.split("|")[0], chunk_id.split("|")[1], chunk_id.split("|")[2]
+#             tid, did, pseq = chunk_id.split("|")
+           
+#             cid = f"{tid}_{did}_{pseq}"
+
+#             base_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
+#             if base_vec is None:
+#                 continue
+
+#             meta_collection.upsert(
+#                 ids=[cid],
+#                 embeddings=[base_vec.tolist()],
+#                 documents=[content or ""],
+#                 metadatas=[{
+#                     "triplet_index": tid,
+#                     "document_id": did,
+#                     "phrase_seq": pseq,
+#                     "restricted": False,
+#                 }],
+#             )
+#             n_ok += 1
+#         return n_ok
+
+#     # Use ThreadPoolExecutor for I/O-bound tasks
+#     total_ok = 0
+#     with ThreadPoolExecutor() as executor:
+#         futures = [executor.submit(process_batch, batch) for batch in batches]
+#         for future in as_completed(futures):
+#             total_ok += future.result()
+
+#     if verbose:
+#         print(f"Added {total_ok} untargeted chunks to the metadata DB.")
+
+
+
+
+
+# @timed("build_rotated_db_untargeted_chunks")
+# def _build_rotated_db_untargeted_chunks_parallel(
+#     gt_records: list[dict],
+#     registry: RotationRegistry,
+#     orig_collection,
+#     rot_collection,
+#     verbose: bool = True,
+# ) -> int:
+#     """Thread-based parallel addition of untargeted chunks to the rotated DB."""
+#     # Get all chunk IDs and targeted chunk IDs
+#     list_of_chunk_ids = get_all_chunk_ids(gt_records)
+#     list_of_targeted_chunk_ids = get_list_id_targeted_chunk(gt_records)
+#     untargeted_chunks = [chunk_id for chunk_id in list_of_chunk_ids if chunk_id not in list_of_targeted_chunk_ids]
+
+#     # Split into batches for parallel processing
+#     batch_size = 100  # Adjust based on system capabilities
+#     batches = [untargeted_chunks[i:i + batch_size] for i in range(0, len(untargeted_chunks), batch_size)]
+
+#     def process_batch(batch: list[str]):
+#         n_ok = 0
+#         for chunk_id in batch:
+#             # tid, did, pseq = chunk_id.split("|")[0], chunk_id.split("|")[1], chunk_id.split("|")[2]
+#             tid, did, pseq = chunk_id.split("|")
+
+#             cid = f"{tid}_{did}_{pseq}"
+
+#             orig_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
+#             if orig_vec is None:
+#                 continue
+
+#             rot_collection.upsert(
+#                 ids=[cid],
+#                 embeddings=[orig_vec.tolist()],
+#                 documents=[content or ""],
+#                 metadatas=[{
+#                     "triplet_index": tid,
+#                     "document_id": did,
+#                     "phrase_seq": pseq,
+#                     "rotation_seed": None,
+#                 }],
+#             )
+#             n_ok += 1
+#             if verbose:
+#                 print(f" untargeted chunk added {chunk_id} → {cid}")
+#         return n_ok
+
+#     # Use ThreadPoolExecutor for I/O-bound tasks
+#     total_ok = 0
+#     with ThreadPoolExecutor() as executor:
+#         futures = [executor.submit(process_batch, batch) for batch in batches]
+#         for future in as_completed(futures):
+#             total_ok += future.result()
+
+#     return total_ok
+
+# # @timed("build_rotated_db_single_record")
+# # def _build_record_parallel(args):
+# #     """Thread-safe helper to rotate and upsert targeted chunks for one record."""
+# #     record, registry, orig_collection, rot_collection = args
+# #     triplet_index = record["id_triplets"]
+# #     stable_chunks = record["targeted_chunk"]
+# #     R = registry.get_or_create(triplet_index)
+# #     n_ok = 0
+
+# #     for chunk_id in stable_chunks:
+# #         tid, did, pseq = chunk_id.split("|")[0], chunk_id[-2], chunk_id[-1]
+# #         tid, did, pseq = chunk_id.split("|")
+
+# #         cid = f"{triplet_index}_{did}_{pseq}"
+
+# #         orig_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
+# #         if orig_vec is None:
+# #             warnings.warn(f"  ⚠  Build: chunk not found {chunk_id} — skipping.")
+# #             continue
+
+# #         rot_vec = apply_rotation(orig_vec, R)
+# #         rot_collection.upsert(
+# #             ids=[cid],
+# #             embeddings=[rot_vec.tolist()],
+# #             documents=[content or ""],
+# #             metadatas=[{
+# #                 "triplet_index": triplet_index,
+# #                 "document_id": did,
+# #                 "phrase_seq": pseq,
+# #                 "rotation_seed": int(registry.seed_of(triplet_index)),
+# #             }],
+# #         )
+# #         n_ok += 1
+
+# #     return n_ok
+
+# # @timed("build_rotated_db")
+# # def build_rotated_db_parallel(
+# #     gt_records: list[dict],
+# #     registry: RotationRegistry,
+# #     orig_collection,
+# #     rot_collection,
+# #     verbose: bool = True,
+# # ) -> RotationRegistry:
+# #     """Thread-based parallel construction of the rotated database."""
+# #     print(f"\n{'─'*60}\n  Phase 1 — Building rotated database (parallel) ({len(gt_records)} records)\n{'─'*60}")
+
+# #     # Prepare arguments for parallel processing
+# #     args_list = [
+# #         (record, registry, orig_collection, rot_collection)
+# #         for record in gt_records
+# #         if record.get("id_triplets") and record.get("targeted_chunk")
+# #     ]
+
+# #     # Process records in parallel using threads
+# #     total_chunks = 0
+# #     with ThreadPoolExecutor() as executor:
+# #         futures = [executor.submit(_build_record_parallel, args) for args in args_list]
+# #         for i, future in enumerate(as_completed(futures), 1):
+# #             n_ok = future.result()
+# #             total_chunks += n_ok
+# #             if verbose:
+# #                 triplet_index = args_list[i-1][0]["id_triplets"]
+# #                 print(f"  [{i}/{len(args_list)}] triplet_{triplet_index}  chunks_upserted={n_ok}")
+
+# #     print(f"\n  ✅ Build complete — {total_chunks} chunk vectors in rotated DB")
+# #     return registry
+
 
 # @timed("build_rotated_db_single_record")
 # def _build_record_parallel(args):
 #     """Thread-safe helper to rotate and upsert targeted chunks for one record."""
-#     record, registry, orig_collection, rot_collection = args
+#     record, registry, orig_collection, rot_collection, user_index = args
 #     triplet_index = record["id_triplets"]
 #     stable_chunks = record["targeted_chunk"]
-#     R = registry.get_or_create(triplet_index)
+#     R = registry.get_or_create(user_index)
 #     n_ok = 0
 
 #     for chunk_id in stable_chunks:
-#         tid, did, pseq = chunk_id.split("|")[0], chunk_id[-2], chunk_id[-1]
+#         # tid, did, pseq = chunk_id.split("|")[0], chunk_id[-2], chunk_id[-1]
+#         tid, did, pseq = chunk_id.split("|")
+
 #         cid = f"{triplet_index}_{did}_{pseq}"
 
 #         orig_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
@@ -867,7 +949,7 @@ def _build_rotated_db_untargeted_chunks_parallel(
 #                 "triplet_index": triplet_index,
 #                 "document_id": did,
 #                 "phrase_seq": pseq,
-#                 "rotation_seed": int(registry.seed_of(triplet_index)),
+#                 "rotation_seed": int(registry.seed_of(user_index)),
 #             }],
 #         )
 #         n_ok += 1
@@ -885,74 +967,424 @@ def _build_rotated_db_untargeted_chunks_parallel(
 #     """Thread-based parallel construction of the rotated database."""
 #     print(f"\n{'─'*60}\n  Phase 1 — Building rotated database (parallel) ({len(gt_records)} records)\n{'─'*60}")
 
-#     # Prepare arguments for parallel processing
-#     args_list = [
-#         (record, registry, orig_collection, rot_collection)
-#         for record in gt_records
-#         if record.get("id_triplets") and record.get("targeted_chunk")
-#     ]
-
-#     # Process records in parallel using threads
-#     total_chunks = 0
 #     with ThreadPoolExecutor() as executor:
-#         futures = [executor.submit(_build_record_parallel, args) for args in args_list]
-#         for i, future in enumerate(as_completed(futures), 1):
-#             n_ok = future.result()
-#             total_chunks += n_ok
-#             if verbose:
-#                 triplet_index = args_list[i-1][0]["id_triplets"]
-#                 print(f"  [{i}/{len(args_list)}] triplet_{triplet_index}  chunks_upserted={n_ok}")
+#         futures = []
+#         for i, record in enumerate(gt_records):
+#             triplet_index = record.get("id_triplets")
+#             if not triplet_index or not record.get("targeted_chunk"):
+#                 continue
+#             futures.append(
+#                 executor.submit(
+#                     _build_record_parallel, 
+#                     (record, registry, orig_collection, rot_collection, i % NUMBER_CLUSTER)
+#                 )
+#             )
+#         for future in as_completed(futures):
+#             future.result()  # Raises exceptions if any
+    
+#     print(f"\n  ✅ Build complete — {len(futures)} chunk vectors in rotated DB")
 
-#     print(f"\n  ✅ Build complete — {total_chunks} chunk vectors in rotated DB")
-#     return registry
+
+#     # # Prepare arguments for parallel processing
+#     # args_list = [
+#     #     (record, registry, orig_collection, rot_collection)
+#     #     for record in gt_records
+#     #     if record.get("id_triplets") and record.get("targeted_chunk")
+#     # ]
+
+#     # # Process records in parallel using threads
+#     # total_chunks = 0
+#     # with ThreadPoolExecutor() as executor:
+#     #     futures = [executor.submit(_build_record_parallel, args) for args in args_list]
+#     #     for i, future in enumerate(as_completed(futures), 1):
+#     #         n_ok = future.result()
+#     #         total_chunks += n_ok
+#     #         if verbose:
+#     #             triplet_index = args_list[i-1][0]["id_triplets"]
+#     #             print(f"  [{i}/{len(args_list)}] triplet_{triplet_index}  chunks_upserted={n_ok}")
+
+#     # print(f"\n  ✅ Build complete — {total_chunks} chunk vectors in rotated DB")
+#     # return registry
+
+#####################################################
+
+def _build_meta_record(
+    record: dict,
+    orig_collection,
+    meta_collection,
+) -> int:
+    """
+    Thread-safe helper to build metadata for all targeted chunks in a record using batch upsert.
+    """
+    triplet_index = record["id_triplets"]
+    stable_chunks = record["targeted_chunk"]
+    n_ok = 0
+
+    batch_ids = []
+    batch_embeddings = []
+    batch_documents = []
+    batch_metadatas = []
+    
+    for chunk_id in stable_chunks:
+        try:
+            tid, did, pseq = chunk_id.split("|")
+            cid = f"meta_{triplet_index}_{did}_{pseq}"
+
+            base_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
+            if base_vec is None:
+                continue
+
+            batch_ids.append(cid)
+            batch_embeddings.append(base_vec.tolist())
+            batch_documents.append(content or "")
+            batch_metadatas.append({
+                "triplet_index": triplet_index,
+                "document_id": did,
+                "phrase_seq": pseq,
+                "restricted": f"{triplet_index}_True",
+            })
+            n_ok += 1
+        except Exception as e:
+            warnings.warn(f"Failed to process chunk {chunk_id}: {e}")
+            continue
+
+    # Batch upsert for all targeted chunks in the record
+    if batch_ids:
+        meta_collection.upsert(
+            ids=batch_ids,
+            embeddings=batch_embeddings,
+            documents=batch_documents,
+            metadatas=batch_metadatas
+        )
+
+    return n_ok
+
+def build_meta_db_parallel(
+    gt_records: list,
+    orig_collection,
+    meta_collection,
+    max_workers: int = 8,
+    verbose: bool = True,
+) -> None:
+    """
+    Parallel construction of the metadata database (per-record, batch upserts).
+    """
+    print(f"\n{'─' * 60}\n  Phase 1b — Building metadata DB (parallel, batched by record)\n{'─' * 60}")
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        for record in gt_records:
+            if not record.get("id_triplets") or not record.get("targeted_chunk"):
+                continue
+            futures.append(
+                executor.submit(
+                    _build_meta_record,
+                    record,
+                    orig_collection,
+                    meta_collection,
+                )
+            )
+
+        for future in as_completed(futures):
+            future.result()
+
+    print("\n  ✅ Metadata DB build complete (parallel with batched upserts)")
+
+def build_meta_db_add_untargeted_chunks_parallel(
+    gt_records: list,
+    orig_collection,
+    meta_collection,
+    batch_size: int = 100,
+    max_workers: int = 8,
+    verbose: bool = True,
+):
+    """
+    Parallel addition of untargeted chunks to meta DB, with batch upserts.
+    """
+    # Use set for efficient chunk difference
+    list_of_chunk_ids = set(get_all_chunk_ids(gt_records))
+    list_of_targeted_chunk_ids = set(get_list_id_targeted_chunk(gt_records))
+    untargeted_chunks = list(list_of_chunk_ids - list_of_targeted_chunk_ids)
+
+    # Create batches
+    batches = [untargeted_chunks[i:i + batch_size] for i in range(0, len(untargeted_chunks), batch_size)]
+
+    def process_batch(batch: list) -> int:
+        batch_ids, batch_embeddings, batch_documents, batch_metadatas = [], [], [], []
+        n_ok = 0
+        for chunk_id in batch:
+            try:
+                tid, did, pseq = chunk_id.split("|")
+                cid = f"{tid}_{did}_{pseq}"
+
+                base_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
+                if base_vec is None:
+                    continue
+
+                batch_ids.append(cid)
+                batch_embeddings.append(base_vec.tolist())
+                batch_documents.append(content or "")
+                batch_metadatas.append({
+                    "triplet_index": tid,
+                    "document_id": did,
+                    "phrase_seq": pseq,
+                    "restricted": False,
+                })
+                n_ok += 1
+            except Exception as e:
+                warnings.warn(f"Failed to process chunk {chunk_id}: {e}")
+                continue
+
+        if batch_ids:
+            meta_collection.upsert(
+                ids=batch_ids,
+                embeddings=batch_embeddings,
+                documents=batch_documents,
+                metadatas=batch_metadatas
+            )
+        return n_ok
+
+    total_ok = 0
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_batch, batch) for batch in batches]
+        for future in as_completed(futures):
+            total_ok += future.result()
+
+    if verbose:
+        print(f"✅ Added {total_ok} untargeted chunks to the metadata DB (batched upsert).")
+
+
+
+
+def _process_aug_untargeted_batch(
+    batch: List[str],
+    cfg,
+    orig_collection,
+    aug_collection,
+) -> int:
+    """Batch-process and upsert untargeted chunks into the augmented DB."""
+    batch_ids, batch_embeddings, batch_documents, batch_metadatas = [], [], [], []
+    n_ok = 0
+    for chunk_id in batch:
+        try:
+            tid, did, pseq = chunk_id.split("|")
+            cid = f"{cfg.config_id}_{chunk_id}"
+
+            base_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
+            if base_vec is None:
+                continue
+
+            aug_vec = augment_chunk(base_vec, cfg, query_index=None, untargeted=True)
+            batch_ids.append(cid)
+            batch_embeddings.append(aug_vec.tolist())
+            batch_documents.append(content or "")
+            batch_metadatas.append({
+                "triplet_index": tid,
+                "document_id": did,
+                "phrase_seq": pseq,
+                "query_index": None,
+                "config_id": cfg.config_id,
+                "restricted": False,
+            })
+            n_ok += 1
+        except Exception as e:
+            warnings.warn(f"Failed to process chunk {chunk_id}: {e}")
+            continue
+
+    if batch_ids:
+        aug_collection.upsert(
+            ids=batch_ids,
+            embeddings=batch_embeddings,
+            documents=batch_documents,
+            metadatas=batch_metadatas
+        )
+    return n_ok
+
+def _build_aug_db_all_untargeted_chunks_parallel(
+    gt_records: List[Dict],
+    cfg,
+    orig_collection,
+    aug_collection,
+    batch_size: int = 100,
+    max_workers: int = 8,
+    verbose: bool = True,
+) -> None:
+    """
+    Thread-based parallel addition of untargeted chunks to the augmented DB, using batch upserts.
+    """
+    list_of_chunk_ids = set(get_all_chunk_ids(gt_records))
+    list_of_targeted_chunk_ids = set(get_list_id_targeted_chunk(gt_records))
+    untargeted_chunks = list(list_of_chunk_ids - list_of_targeted_chunk_ids)
+    print(f"Found {len(untargeted_chunks)} untargeted chunks to add to the augmented DB.")
+
+    batches = [untargeted_chunks[i:i + batch_size] for i in range(0, len(untargeted_chunks), batch_size)]
+
+    total_ok = 0
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(_process_aug_untargeted_batch, batch, cfg, orig_collection, aug_collection)
+            for batch in batches
+        ]
+        for future in as_completed(futures):
+            total_ok += future.result()
+
+    if verbose:
+        print(f"✅ Added {total_ok} untargeted chunks to the augmented DB (batched upsert).")
+
+def _build_aug_record(
+    record: Dict,
+    query_index: int,
+    cfg,
+    orig_collection,
+    aug_collection,
+) -> int:
+    """
+    Thread-safe helper to build augmented chunks for a single record, using batch upsert.
+    """
+    triplet_index = record["id_triplets"]
+    stable_chunks = record["targeted_chunk"]
+    n_ok = 0
+
+    batch_ids, batch_embeddings, batch_documents, batch_metadatas = [], [], [], []
+
+    for chunk_id in stable_chunks:
+        try:
+            tid, did, pseq = chunk_id.split("|")
+            cid = f"{cfg.config_id}_{triplet_index}_{did}_{pseq}"
+
+            base_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
+            if base_vec is None:
+                continue
+
+            aug_vec = augment_chunk(base_vec, cfg, query_index=query_index)
+            batch_ids.append(cid)
+            batch_embeddings.append(aug_vec.tolist())
+            batch_documents.append(content or "")
+            batch_metadatas.append({
+                "triplet_index": triplet_index,
+                "document_id": did,
+                "phrase_seq": pseq,
+                "query_index": query_index,
+                "config_id": cfg.config_id,
+                "restricted": True,
+            })
+            n_ok += 1
+        except Exception as e:
+            warnings.warn(f"Failed to process chunk {chunk_id}: {e}")
+            continue
+
+    if batch_ids:
+        aug_collection.upsert(
+            ids=batch_ids,
+            embeddings=batch_embeddings,
+            documents=batch_documents,
+            metadatas=batch_metadatas
+        )
+    return n_ok
+
+def build_aug_db_parallel(
+    gt_records: List[Dict],
+    cfg,
+    orig_collection,
+    aug_collection,
+    max_workers: int = 8,
+    verbose: bool = True,
+) -> None:
+    """
+    Thread-based parallel construction of the augmented DB, using batch upserts per record.
+    """
+    print(f"\n{'─' * 60}\n  Phase 1a — Building augmented DB (parallel with threads)\n{'─' * 60}")
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        for i, record in enumerate(gt_records):
+            triplet_index = record.get("id_triplets")
+            if not triplet_index or not record.get("targeted_chunk"):
+                continue
+            futures.append(
+                executor.submit(
+                    _build_aug_record,
+                    record,
+                    i % NUMBER_CLUSTER,
+                    cfg,
+                    orig_collection,
+                    aug_collection,
+                )
+            )
+
+        for future in as_completed(futures):
+            future.result()
+
+    print(f"\n  ✅ Augmented DB build complete (parallel, batch upserts by record)")
+
 
 
 @timed("build_rotated_db_single_record")
-def _build_record_parallel(args):
-    """Thread-safe helper to rotate and upsert targeted chunks for one record."""
-    record, registry, orig_collection, rot_collection, user_index = args
+def _build_record_parallel(
+    record,
+    registry,
+    orig_collection,
+    rot_collection,
+    user_index
+) -> int:
+    """
+    Rotate and upsert targeted chunks for one record in a batched way (thread-safe).
+    """
     triplet_index = record["id_triplets"]
     stable_chunks = record["targeted_chunk"]
     R = registry.get_or_create(user_index)
     n_ok = 0
 
+    batch_ids, batch_embeddings, batch_documents, batch_metadatas = [], [], [], []
+
     for chunk_id in stable_chunks:
-        tid, did, pseq = chunk_id.split("|")[0], chunk_id[-2], chunk_id[-1]
-        cid = f"{triplet_index}_{did}_{pseq}"
+        try:
+            tid, did, pseq = chunk_id.split("|")
+            cid = f"{triplet_index}_{did}_{pseq}"
 
-        orig_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
-        if orig_vec is None:
-            warnings.warn(f"  ⚠  Build: chunk not found {chunk_id} — skipping.")
-            continue
+            orig_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
+            if orig_vec is None:
+                warnings.warn(f"  ⚠  Build: chunk not found {chunk_id} — skipping.")
+                continue
 
-        rot_vec = apply_rotation(orig_vec, R)
-        rot_collection.upsert(
-            ids=[cid],
-            embeddings=[rot_vec.tolist()],
-            documents=[content or ""],
-            metadatas=[{
+            rot_vec = apply_rotation(orig_vec, R)
+
+            batch_ids.append(cid)
+            batch_embeddings.append(rot_vec.tolist())
+            batch_documents.append(content or "")
+            batch_metadatas.append({
                 "triplet_index": triplet_index,
                 "document_id": did,
                 "phrase_seq": pseq,
                 "rotation_seed": int(registry.seed_of(user_index)),
-            }],
-        )
-        n_ok += 1
+            })
+            n_ok += 1
+        except Exception as e:
+            warnings.warn(f"Failed to process chunk {chunk_id}: {e}")
+            continue
 
+    if batch_ids:
+        rot_collection.upsert(
+            ids=batch_ids,
+            embeddings=batch_embeddings,
+            documents=batch_documents,
+            metadatas=batch_metadatas
+        )
     return n_ok
 
 @timed("build_rotated_db")
 def build_rotated_db_parallel(
-    gt_records: list[dict],
-    registry: RotationRegistry,
+    gt_records: list,
+    registry,
     orig_collection,
     rot_collection,
-    verbose: bool = True,
-) -> RotationRegistry:
-    """Thread-based parallel construction of the rotated database."""
+    max_workers: int = 8,
+    verbose: bool = True
+) -> "RotationRegistry":
+    """Thread-based parallel construction of the rotated DB, with batched upsert per record."""
     print(f"\n{'─'*60}\n  Phase 1 — Building rotated database (parallel) ({len(gt_records)} records)\n{'─'*60}")
 
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = []
         for i, record in enumerate(gt_records):
             triplet_index = record.get("id_triplets")
@@ -961,40 +1393,96 @@ def build_rotated_db_parallel(
             futures.append(
                 executor.submit(
                     _build_record_parallel, 
-                    (record, registry, orig_collection, rot_collection, i % NUMBER_CLUSTER)
+                    record, registry, orig_collection, rot_collection, i % NUMBER_CLUSTER
                 )
             )
         for future in as_completed(futures):
             future.result()  # Raises exceptions if any
     
     print(f"\n  ✅ Build complete — {len(futures)} chunk vectors in rotated DB")
+    return registry
+
+@timed("build_rotated_db_untargeted_chunks")
+def _process_rot_untargeted_batch(
+    batch: list,
+    orig_collection,
+    rot_collection,
+    verbose: bool = True,
+) -> int:
+    """Batch-process and upsert untargeted chunks to the rotated DB."""
+    batch_ids, batch_embeddings, batch_documents, batch_metadatas = [], [], [], []
+    n_ok = 0
+    for chunk_id in batch:
+        try:
+            tid, did, pseq = chunk_id.split("|")
+            cid = f"{tid}_{did}_{pseq}"
+
+            orig_vec, content = fetch_chunk(orig_collection, tid, did, pseq)
+            if orig_vec is None:
+                continue
+
+            batch_ids.append(cid)
+            batch_embeddings.append(orig_vec.tolist())
+            batch_documents.append(content or "")
+            batch_metadatas.append({
+                "triplet_index": tid,
+                "document_id": did,
+                "phrase_seq": pseq,
+                "rotation_seed": None,
+            })
+            n_ok += 1
+            if verbose:
+                print(f" untargeted chunk added {chunk_id} → {cid}")
+        except Exception as e:
+            warnings.warn(f"Failed to process chunk {chunk_id}: {e}")
+            continue
+
+    if batch_ids:
+        rot_collection.upsert(
+            ids=batch_ids,
+            embeddings=batch_embeddings,
+            documents=batch_documents,
+            metadatas=batch_metadatas
+        )
+    return n_ok
+
+@timed("build_rotated_db_untargeted_chunks")
+def _build_rotated_db_untargeted_chunks_parallel(
+    gt_records: list,
+    registry,
+    orig_collection,
+    rot_collection,
+    batch_size: int = 100,
+    max_workers: int = 8,
+    verbose: bool = True
+) -> int:
+    """
+    Thread-based parallel addition of untargeted chunks to the rotated DB, with batch upserts.
+    """
+    list_of_chunk_ids = set(get_all_chunk_ids(gt_records))
+    list_of_targeted_chunk_ids = set(get_list_id_targeted_chunk(gt_records))
+    untargeted_chunks = list(list_of_chunk_ids - list_of_targeted_chunk_ids)
+
+    batches = [untargeted_chunks[i:i + batch_size] for i in range(0, len(untargeted_chunks), batch_size)]
+
+    total_ok = 0
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(
+                _process_rot_untargeted_batch,
+                batch,
+                orig_collection,
+                rot_collection,
+                verbose
+            ) for batch in batches
+        ]
+        for future in as_completed(futures):
+            total_ok += future.result()
+
+    return total_ok
 
 
-    # # Prepare arguments for parallel processing
-    # args_list = [
-    #     (record, registry, orig_collection, rot_collection)
-    #     for record in gt_records
-    #     if record.get("id_triplets") and record.get("targeted_chunk")
-    # ]
-
-    # # Process records in parallel using threads
-    # total_chunks = 0
-    # with ThreadPoolExecutor() as executor:
-    #     futures = [executor.submit(_build_record_parallel, args) for args in args_list]
-    #     for i, future in enumerate(as_completed(futures), 1):
-    #         n_ok = future.result()
-    #         total_chunks += n_ok
-    #         if verbose:
-    #             triplet_index = args_list[i-1][0]["id_triplets"]
-    #             print(f"  [{i}/{len(args_list)}] triplet_{triplet_index}  chunks_upserted={n_ok}")
-
-    # print(f"\n  ✅ Build complete — {total_chunks} chunk vectors in rotated DB")
-    # return registry
-
-
-
-
-
+#####################################################################################
 
 @timed("query_phase_single_record")
 def _query_record_parallel_2(args):
@@ -1101,12 +1589,15 @@ def _query_record_parallel_2(args):
     )
 
 
-    target_chunk_id = [f'{target.split("|")[0]}|{target[-2]}|{target[-1]}' for target in stable_chunks]
+    # target_chunk_id = [f'{target.split("|")[0]}|{target[-2]}|{target[-1]}' for target in stable_chunks]
+    target_chunk_id = list(stable_chunks)
 
     # get embedding from ground truth
     embedding_ground_truth = {}
     for chunk_id in target_chunk_id:
-        tid, did, pseq = chunk_id.split("|")[0], chunk_id.split("|")[1], chunk_id.split("|")[2]
+        # tid, did, pseq = chunk_id.split("|")[0], chunk_id.split("|")[1], chunk_id.split("|")[2]
+        tid, did, pseq = chunk_id.split("|")
+
         base_vec, _ = fetch_chunk(orig_collection, tid, did, pseq)
         if base_vec is not None:
             embedding_ground_truth[chunk_id] = base_vec.tolist()
@@ -1143,7 +1634,9 @@ def _query_record_parallel_2(args):
     # Collect chunk vectors
     chunk_vectors = {}
     for chunk_id in stable_chunks:
-        tid, did, pseq = chunk_id.split("|")[0], chunk_id[-2], chunk_id[-1]
+        # tid, did, pseq = chunk_id.split("|")[0], chunk_id[-2], chunk_id[-1]
+        tid, did, pseq = chunk_id.split("|")
+
         base_vec, _ = fetch_chunk(orig_collection, tid, did, pseq)
         if base_vec is not None:
             chunk_vectors[chunk_id] = {"base": base_vec.tolist(), 
@@ -1199,181 +1692,183 @@ def _query_record_parallel_2(args):
 
     )
 
-# @timed("query_phase_single_record")
-# def _query_record_parallel(args):
-#     """
-#     Thread-safe helper to process a single query record.
-#     Args:
-#         args: Tuple of (record, query_index, cfg, registry, embedder, orig_collection, aug_collection, meta_collection, rotation_collection, top_k)
-#     """
-#     record, query_index, cfg, registry, embedder, orig_collection, aug_collection, meta_collection, rot_collection, top_k = args
-#     question = record["question"]
-#     triplet_index = record["id_triplets"]
-#     stable_chunks = record["targeted_chunk"]
-#     query_id = f"triplet_{triplet_index}"
-#     targeted_keys = set(stable_chunks)
+@timed("query_phase_single_record")
+def _query_record_parallel(args):
+    """
+    Thread-safe helper to process a single query record.
+    Args:
+        args: Tuple of (record, query_index, cfg, registry, embedder, orig_collection, aug_collection, meta_collection, rotation_collection, top_k)
+    """
+    record, query_index, cfg, registry, embedder, orig_collection, aug_collection, meta_collection, rot_collection, top_k = args
+    question = record["question"]
+    triplet_index = record["id_triplets"]
+    stable_chunks = record["targeted_chunk"]
+    query_id = f"triplet_{triplet_index}"
+    targeted_keys = set(stable_chunks)
 
-#     R             = registry.get(query_index)
-#     seed          = registry.seed_of(query_index)
+    R             = registry.get(query_index)
+    seed          = registry.seed_of(query_index)
 
-#     # Step 1: Embed raw query
-#     t0 = time.perf_counter()
-#     raw_q = np.array(embedder.embed_query(BGE_QUERY_PREFIX + question), dtype=np.float32)
-#     t_embed_query_s = time.perf_counter() - t0
+    # Step 1: Embed raw query
+    t0 = time.perf_counter()
+    raw_q = np.array(embedder.embed_query(BGE_QUERY_PREFIX + question), dtype=np.float32)
+    t_embed_query_s = time.perf_counter() - t0
 
 
-#     # Step 2: Augment query vectors and perform the rotation
-#     t0 = time.perf_counter()   
-#     auth_q = augment_query(raw_q, cfg, query_index, authorised=True)
-#     t_augment_auth_s = time.perf_counter() - t0
+    # Step 2: Augment query vectors and perform the rotation
+    t0 = time.perf_counter()   
+    auth_q = augment_query(raw_q, cfg, query_index, authorised=True)
+    t_augment_auth_s = time.perf_counter() - t0
     
-#     t0 = time.perf_counter()
-#     unauth_q = augment_query(raw_q, cfg, query_index, authorised=False)
-#     t_augment_unauth_s = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    unauth_q = augment_query(raw_q, cfg, query_index, authorised=False)
+    t_augment_unauth_s = time.perf_counter() - t0
 
-#     t0 = time.perf_counter()
-#     rot_query_vec = apply_rotation(raw_q, R)
-#     t_apply_rotation_s = time.perf_counter() - t0
-
-
-#     # Step 3: Retrieve from augmented DB
-#     n_aug = max(1, aug_collection.count())
-#     n_meta = max(1, meta_collection.count())
-#     n_rot = max(1, rot_collection.count())
-
-#     t0 = time.perf_counter()
-#     orig_res = orig_collection.query(
-#         query_embeddings=[raw_q.tolist()],
-#         n_results=min(top_k, orig_collection.count()),
-#         include=["metadatas", "embeddings"],
-#     )
-#     t_query_orig = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    rot_query_vec = apply_rotation(raw_q, R)
+    t_apply_rotation_s = time.perf_counter() - t0
 
 
-#     t0 = time.perf_counter()
-#     aug_res_auth = aug_collection.query(
-#         query_embeddings=[auth_q.tolist()],
-#         n_results=min(top_k, n_aug),
-#         include=["metadatas", "embeddings"],
-#     )
-#     t_query_aug_auth_s = time.perf_counter() - t0
+    # Step 3: Retrieve from augmented DB
+    n_aug = max(1, aug_collection.count())
+    n_meta = max(1, meta_collection.count())
+    n_rot = max(1, rot_collection.count())
 
-#     t0 = time.perf_counter()
-#     aug_res_unauth = aug_collection.query(
-#         query_embeddings=[unauth_q.tolist()],
-#         n_results=min(top_k, n_aug),
-#         include=["metadatas", "embeddings"],
-#     )
-#     t_query_aug_unauth_s = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    orig_res = orig_collection.query(
+        query_embeddings=[raw_q.tolist()],
+        n_results=min(top_k, orig_collection.count()),
+        include=["metadatas", "embeddings"],
+    )
+    t_query_orig = time.perf_counter() - t0
 
-#     # Step 4: Retrieve from metadata DB
+
+    t0 = time.perf_counter()
+    aug_res_auth = aug_collection.query(
+        query_embeddings=[auth_q.tolist()],
+        n_results=min(top_k, n_aug),
+        include=["metadatas", "embeddings"],
+    )
+    t_query_aug_auth_s = time.perf_counter() - t0
+
+    t0 = time.perf_counter()
+    aug_res_unauth = aug_collection.query(
+        query_embeddings=[unauth_q.tolist()],
+        n_results=min(top_k, n_aug),
+        include=["metadatas", "embeddings"],
+    )
+    t_query_aug_unauth_s = time.perf_counter() - t0
+
+    # Step 4: Retrieve from metadata DB
     
     
-#     t0 = time.perf_counter()
-#     meta_res_auth = meta_collection.query(
-#         query_embeddings=[raw_q.tolist()],
-#         n_results=min(top_k, n_meta),
-#         where={"restricted": {"$eq": f"{triplet_index}_True"}},
-#         include=["metadatas", "embeddings"],
-#     )
-#     t_query_meta_auth_s = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    meta_res_auth = meta_collection.query(
+        query_embeddings=[raw_q.tolist()],
+        n_results=min(top_k, n_meta),
+        where={"restricted": {"$eq": f"{triplet_index}_True"}},
+        include=["metadatas", "embeddings"],
+    )
+    t_query_meta_auth_s = time.perf_counter() - t0
 
-#     t0 = time.perf_counter()
-#     meta_res_unauth = meta_collection.query(
-#         query_embeddings=[raw_q.tolist()],
-#         n_results=min(top_k, n_meta),
-#         where={"restricted": {"$ne": f"{triplet_index}_True"}},
-#         include=["metadatas", "embeddings"],
-#     )
-#     t_query_meta_unauth_s = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    meta_res_unauth = meta_collection.query(
+        query_embeddings=[raw_q.tolist()],
+        n_results=min(top_k, n_meta),
+        where={"restricted": {"$ne": f"{triplet_index}_True"}},
+        include=["metadatas", "embeddings"],
+    )
+    t_query_meta_unauth_s = time.perf_counter() - t0
 
-#     # Rotation retrieve
+    # Rotation retrieve
 
-#     t0 = time.perf_counter()
-#     rot_res = rot_collection.query(
-#         query_embeddings=[rot_query_vec.tolist()],
-#         n_results=min(top_k, n_rot),
-#         include=["metadatas", "embeddings"],
-#     )
-#     t_query_rotated_s = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    rot_res = rot_collection.query(
+        query_embeddings=[rot_query_vec.tolist()],
+        n_results=min(top_k, n_rot),
+        include=["metadatas", "embeddings"],
+    )
+    t_query_rotated_s = time.perf_counter() - t0
 
-#     rot_res_unrot = rot_collection.query(
-#         query_embeddings=[raw_q.tolist()],
-#         n_results=min(top_k, n_rot),
-#         include=["metadatas", "embeddings"],
-#     )
-
-
+    rot_res_unrot = rot_collection.query(
+        query_embeddings=[raw_q.tolist()],
+        n_results=min(top_k, n_rot),
+        include=["metadatas", "embeddings"],
+    )
 
 
 
-#     # Format results
-#     def _ids(metas):
-#         return [f"{m.get('triplet_index', '?')}|{m.get('document_id', '?')}|{m.get('phrase_seq', '?')}" for m in metas]
 
 
-#     orig_topk = _ids(orig_res["metadatas"][0])
-#     aug_topk_auth = _ids(aug_res_auth["metadatas"][0])
-#     aug_topk_unauth = _ids(aug_res_unauth["metadatas"][0])
-#     meta_topk_auth = _ids(meta_res_auth["metadatas"][0])
-#     meta_topk_unauth = _ids(meta_res_unauth["metadatas"][0])
-#     rot_topk_auth = _ids(rot_res["metadatas"][0])
-#     rot_topk_unrot = _ids(rot_res_unrot["metadatas"][0])
+    # Format results
+    def _ids(metas):
+        return [f"{m.get('triplet_index', '?')}|{m.get('document_id', '?')}|{m.get('phrase_seq', '?')}" for m in metas]
 
-#     # Collect chunk vectors
-#     chunk_vectors = {}
-#     for chunk_id in stable_chunks:
-#         tid, did, pseq = chunk_id.split("|")[0], chunk_id[-2], chunk_id[-1]
-#         base_vec, _ = fetch_chunk(orig_collection, tid, did, pseq)
-#         if base_vec is not None:
-#             chunk_vectors[chunk_id] = {"base": base_vec.tolist(), 
-#                                        "rot": apply_rotation(base_vec, R).tolist(), 
-#                                        "aug": augment_chunk(base_vec, cfg, query_index=query_index).tolist(),
-#                                        "rot_query": rot_query_vec.tolist(),
-#                                        }
 
-#     # return RawQueryRetrieval(
-#     #     query_id=query_id,
-#     #     question=question,
-#     #     triplet_index=triplet_index,
-#     #     query_index=query_index,
-#     #     targeted_chunk_ids=list(stable_chunks),
-#     #     query_vec=raw_q.tolist(),
-#     #     chunk_vectors=chunk_vectors,
-#     #     aug_topk_auth_ids=aug_topk_auth,
-#     #     aug_topk_unauth_ids=aug_topk_unauth,
-#     #     meta_topk_auth_ids=meta_topk_auth,
-#     #     meta_topk_unauth_ids=meta_topk_unauth,
-#     # )
+    orig_topk = _ids(orig_res["metadatas"][0])
+    aug_topk_auth = _ids(aug_res_auth["metadatas"][0])
+    aug_topk_unauth = _ids(aug_res_unauth["metadatas"][0])
+    meta_topk_auth = _ids(meta_res_auth["metadatas"][0])
+    meta_topk_unauth = _ids(meta_res_unauth["metadatas"][0])
+    rot_topk_auth = _ids(rot_res["metadatas"][0])
+    rot_topk_unrot = _ids(rot_res_unrot["metadatas"][0])
 
-#     return RawQueryRetrieval(
-#         query_id=query_id,
-#         question=question,
-#         triplet_index=triplet_index,
-#         query_index=query_index,
-#         targeted_chunk_ids=list(stable_chunks),
-#         rotation_seed=seed,
-#         rot_query_vec=rot_query_vec.tolist(),
-#         query_vec=raw_q.tolist(),
-#         chunk_vectors=chunk_vectors,
-#         original_topk_ids=orig_topk,
-#         aug_topk_auth_ids=aug_topk_auth,
-#         aug_topk_unauth_ids=aug_topk_unauth,
-#         meta_topk_auth_ids=meta_topk_auth,
-#         meta_topk_unauth_ids=meta_topk_unauth,
-#         rotated_topk_ids=rot_topk_auth,
-#         rotated_topk_ids_unrot_query=rot_topk_unrot,
-#         t_query_orig_s=t_query_orig,
-#         t_embed_query_s=t_embed_query_s,
-#         t_augment_auth_s=t_augment_auth_s,
-#         t_augment_unauth_s=t_augment_unauth_s,
-#         t_apply_rotation_s=t_apply_rotation_s,
-#         t_query_aug_auth_s=t_query_aug_auth_s,
-#         t_query_aug_unauth_s=t_query_aug_unauth_s,
-#         t_query_meta_auth_s=t_query_meta_auth_s,
-#         t_query_meta_unauth_s=t_query_meta_unauth_s,
-#         t_query_rotated_s=t_query_rotated_s,
-#     )
+    # Collect chunk vectors
+    chunk_vectors = {}
+    for chunk_id in stable_chunks:
+        # tid, did, pseq = chunk_id.split("|")[0], chunk_id[-2], chunk_id[-1]
+        tid, did, pseq = chunk_id.split("|")
+
+        base_vec, _ = fetch_chunk(orig_collection, tid, did, pseq)
+        if base_vec is not None:
+            chunk_vectors[chunk_id] = {"base": base_vec.tolist(), 
+                                       "rot": apply_rotation(base_vec, R).tolist(), 
+                                       "aug": augment_chunk(base_vec, cfg, query_index=query_index).tolist(),
+                                       "rot_query": rot_query_vec.tolist(),
+                                       }
+
+    # return RawQueryRetrieval(
+    #     query_id=query_id,
+    #     question=question,
+    #     triplet_index=triplet_index,
+    #     query_index=query_index,
+    #     targeted_chunk_ids=list(stable_chunks),
+    #     query_vec=raw_q.tolist(),
+    #     chunk_vectors=chunk_vectors,
+    #     aug_topk_auth_ids=aug_topk_auth,
+    #     aug_topk_unauth_ids=aug_topk_unauth,
+    #     meta_topk_auth_ids=meta_topk_auth,
+    #     meta_topk_unauth_ids=meta_topk_unauth,
+    # )
+
+    return RawQueryRetrieval(
+        query_id=query_id,
+        question=question,
+        triplet_index=triplet_index,
+        query_index=query_index,
+        targeted_chunk_ids=list(stable_chunks),
+        rotation_seed=seed,
+        rot_query_vec=rot_query_vec.tolist(),
+        query_vec=raw_q.tolist(),
+        chunk_vectors=chunk_vectors,
+        original_topk_ids=orig_topk,
+        aug_topk_auth_ids=aug_topk_auth,
+        aug_topk_unauth_ids=aug_topk_unauth,
+        meta_topk_auth_ids=meta_topk_auth,
+        meta_topk_unauth_ids=meta_topk_unauth,
+        rotated_topk_ids=rot_topk_auth,
+        rotated_topk_ids_unrot_query=rot_topk_unrot,
+        t_query_orig_s=t_query_orig,
+        t_embed_query_s=t_embed_query_s,
+        t_augment_auth_s=t_augment_auth_s,
+        t_augment_unauth_s=t_augment_unauth_s,
+        t_apply_rotation_s=t_apply_rotation_s,
+        t_query_aug_auth_s=t_query_aug_auth_s,
+        t_query_aug_unauth_s=t_query_aug_unauth_s,
+        t_query_meta_auth_s=t_query_meta_auth_s,
+        t_query_meta_unauth_s=t_query_meta_unauth_s,
+        t_query_rotated_s=t_query_rotated_s,
+    )
 
 
 
@@ -1405,7 +1900,7 @@ def run_query_phase_parallel(
     # Process queries in parallel using threads
     raw_results = []
     with ThreadPoolExecutor(max_workers=NUMBER_THREADS) as executor:
-        futures = [executor.submit(_query_record_parallel_2, args) for args in args_list]
+        futures = [executor.submit(_query_record_parallel, args) for args in args_list]
         for future in as_completed(futures):
             raw_results.append(future.result())
 
@@ -1431,7 +1926,8 @@ def _evaluate_record_optimized(
 
     # Precompute all chunk vectors and similarities in batches
     chunk_sims = []
-    target_chunk_id = [f'{target.split("|")[0]}|{target[-2]}|{target[-1]}' for target in targeted]
+    # target_chunk_id = [f'{target.split("|")[0]}|{target[-2]}|{target[-1]}' for target in targeted]
+    target_chunk_id = list(targeted)
 
     # Batch process chunk similarities
     for chunk_id, vecs in raw.chunk_vectors.items():
@@ -1696,10 +2192,10 @@ def run_experiment_parallel(
     print(f"\n  ✅ Raw query results saved to {RAW_RESULTS_FILE}")
 
 
-    # # Phase 3: Evaluation (unchanged)
-    # eval_results = evaluate_results_parallel(raw_results, cfg, top_k, verbose=verbose)
-    # save_timing_log(eval_results=eval_results)
-    # return eval_results
+    # Phase 3: Evaluation (unchanged)
+    eval_results = evaluate_results_parallel(raw_results, cfg, top_k, verbose=verbose)
+    save_timing_log(eval_results=eval_results)
+    return eval_results
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Access-control embedding experiment (parallel)")

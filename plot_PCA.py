@@ -47,14 +47,34 @@ def get_all_chunk_ids(data) -> List[str]:
             chunk_ids.append(f"{id_triplet}|{sentence[0][-2]}|{sentence[0][-1]}")
     return chunk_ids
 
+# def get_list_id_targeted_chunk(data) -> List[str]:
+#     """Extract all targeted chunk ids from the data, in the format "triplet_index|document_id|phrase_seq"."""
+#     list_of_chunk_ids = []
+#     for chunk in data:
+#         for chunk_id in chunk.get("targeted_chunk", []):
+#             if f'{chunk_id.split("|")[0]}|{chunk_id[-2]}|{chunk_id[-1]}' not in list_of_chunk_ids:
+#                 list_of_chunk_ids.append(f'{chunk_id.split("|")[0]}|{chunk_id[-2]}|{chunk_id[-1]}')
+#     return list_of_chunk_ids
+
+#new version of the functions with the change for th encoding format
+# def get_all_chunk_ids(data) -> List[str]:
+#     """Extract all chunk ids from the data, in the format "triplet_index|document_id|phrase_seq"."""
+#     chunk_ids : List[str] = []
+#     for chunk in data:
+#         id_triplet = chunk.get("id_triplets", "")
+#         for sentence in chunk.get("sentences", []):
+#             chunk_ids.append(sentence)
+#     return chunk_ids
+
 def get_list_id_targeted_chunk(data) -> List[str]:
     """Extract all targeted chunk ids from the data, in the format "triplet_index|document_id|phrase_seq"."""
     list_of_chunk_ids = []
     for chunk in data:
         for chunk_id in chunk.get("targeted_chunk", []):
-            if f'{chunk_id.split("|")[0]}|{chunk_id[-2]}|{chunk_id[-1]}' not in list_of_chunk_ids:
-                list_of_chunk_ids.append(f'{chunk_id.split("|")[0]}|{chunk_id[-2]}|{chunk_id[-1]}')
+            if chunk_id not in list_of_chunk_ids:
+                list_of_chunk_ids.append(chunk_id)
     return list_of_chunk_ids
+
 
 
 # for the embedding

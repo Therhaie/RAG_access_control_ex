@@ -26,7 +26,7 @@ def main():
     list_identifier = set()
     for entries in ground_truth_data:
         for entry in entries["stable_chunks"]:
-            list_identifier.add(f'{entry["triplet_index"]}|{entry["document_id"]}{entry["phrase_seq"]}')
+            list_identifier.add(f'{entry["triplet_index"]}|{entry["document_id"]}|{entry["phrase_seq"]}')
             # len(list_identifier) = 993
 
 
@@ -49,7 +49,7 @@ def main():
                 document_id = entry.get("document_id")
                 phrase_seq = entry.get("phrase_seq")
 
-                chunk_identifier = f"{triplet_index}|{document_id}{phrase_seq}"
+                chunk_identifier = f"{triplet_index}|{document_id}|{phrase_seq}"
                 if chunk_identifier not in list_append_chunk:
                     list_append_chunk.append(chunk_identifier)
 

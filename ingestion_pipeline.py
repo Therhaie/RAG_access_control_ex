@@ -364,7 +364,7 @@ def main():
     
     # chunks  = load_file(path_output)
     # vectore_store = create_vector_store(chunks)
-    # print("\n ingestion completed")
+    print("\n ingestion completed")
     _check_vllm_health_1()
 
 if __name__ == "__main__":
