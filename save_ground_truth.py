@@ -1,5 +1,6 @@
 import json 
 import argparse
+from pathlib import Path
 
 
 
@@ -18,6 +19,11 @@ if __name__ == "__main__":
         item.pop("question", None)
         item.pop("response", None)
         item.pop("sentences", None)
+    
+    # Output path
+    output_path = Path(f"results_experiment_extra_dim/GT_results/ground_truth_{args.top_k}.json")
+    # Create parent directories if they do not exist
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(f"results_experiment_extra_dim/GT_results/ground_truth_{args.top_k}.json", "w", encoding="utf-8") as f:
+    with output_path.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)

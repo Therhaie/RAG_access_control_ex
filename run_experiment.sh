@@ -27,11 +27,11 @@ do
     echo "=== Measuring for parameter: $val ==="
 
     
-    # start=$(date +%s.%N)
-    # python ingestion_pipeline.py
-    # end=$(date +%s.%N)
-    # duration=$(echo "$end - $start" | bc)
-    # echo "ingestion_pipeline.py took $duration seconds"
+    start=$(date +%s.%N)
+    python ingestion_pipeline.py
+    end=$(date +%s.%N)
+    duration=$(echo "$end - $start" | bc)
+    echo "ingestion_pipeline.py took $duration seconds"
     
     # 1. ground_truth_collector.py
     start=$(date +%s.%N)
@@ -78,20 +78,20 @@ do
     # duration=$(echo "$end - $start" | bc)
     # echo "experiment_extra_dim.py took $duration seconds"
 
-    # ### experiment extra dimension optimized raw retrieved
-    # start=$(date +%s.%N)
-    # python opti_experiment_raw_retrieve.py --top-k $val --quiet
-    # end=$(date +%s.%N)
-    # duration=$(echo "$end - $start" | bc)
-    # echo "opti_experiment_raw_retrieve.py took $duration seconds"
+    ### experiment extra dimension optimized raw retrieved
+    start=$(date +%s.%N)
+    python opti_experiment_raw_retrieve.py --top-k $val --quiet
+    end=$(date +%s.%N)
+    duration=$(echo "$end - $start" | bc)
+    echo "opti_experiment_raw_retrieve.py took $duration seconds"
 
 
-    # python save_ground_truth.py --top-k $val
+    python save_ground_truth.py --top-k $val
 
 
-    # rm -rf RAGBench_whole/merged_id_triplets_no_duplicates.json
-    # rm -rf RAGBench_whole/merged_id_triplets_with_metadata2.json
-    # rm -rf RAGBench_whole/ground_truth_retrievals.json
+    rm -rf RAGBench_whole/merged_id_triplets_no_duplicates.json
+    rm -rf RAGBench_whole/merged_id_triplets_with_metadata2.json
+    rm -rf RAGBench_whole/ground_truth_retrievals.json
 
     
     echo "--------------------------------------------"

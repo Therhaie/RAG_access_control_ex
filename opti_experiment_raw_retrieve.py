@@ -52,7 +52,8 @@ META_NAME = "meta_access_control_experiment"
 ROTATED_CHROMA      = os.path.join(os.getcwd(), "./chroma_rotated_db_log")
 ROTATED_COLLECTION  = "rotated_experiment"
 
-NUMBER_THREADS = 64
+NUMBER_THREADS = 96 #64
+BATCH_SIZE = 500
 
 # --- Timing and logging (unchanged) ---
 TIMING_LOG: List[Dict] = []
@@ -1900,7 +1901,7 @@ def run_query_phase_parallel(
     # Process queries in parallel using threads
     raw_results = []
     with ThreadPoolExecutor(max_workers=NUMBER_THREADS) as executor:
-        futures = [executor.submit(_query_record_parallel, args) for args in args_list]
+        futures = [executor.submit(_query_record_parallel_2, args) for args in args_list]
         for future in as_completed(futures):
             raw_results.append(future.result())
 
@@ -2167,35 +2168,36 @@ def run_experiment_parallel(
     registry = RotationRegistry(dim=dim)
 
     # Phase 1: Parallel DB construction
-    build_aug_db_parallel(gt_records, cfg, orig_coll, aug_coll, verbose=False)
-    build_meta_db_parallel(gt_records, orig_coll, meta_coll, verbose=False)
-    build_rotated_db_parallel(gt_records, registry, orig_coll, rot_coll, verbose=False)
+    build_aug_db_parallel(gt_records, cfg, orig_coll, aug_coll, max_workers=NUMBER_THREADS, verbose=False)
+    build_meta_db_parallel(gt_records, orig_coll, meta_coll, max_workers=NUMBER_THREADS, verbose=False)
+    build_rotated_db_parallel(gt_records, registry, orig_coll, rot_coll, max_workers=NUMBER_THREADS, verbose=False)
 
-    _build_aug_db_all_untargeted_chunks_parallel(gt_records, cfg, orig_coll, aug_coll, verbose=False)
-    build_meta_db_add_untargeted_chunks_parallel(gt_records, orig_coll, meta_coll, verbose=False)
-    _build_rotated_db_untargeted_chunks_parallel(gt_records, registry, orig_coll, rot_coll, verbose=False)
+    _build_aug_db_all_untargeted_chunks_parallel(gt_records, cfg, orig_coll, aug_coll, batch_size=BATCH_SIZE, max_workers=NUMBER_THREADS, verbose=False)
+    build_meta_db_add_untargeted_chunks_parallel(gt_records, orig_coll, meta_coll, batch_size=BATCH_SIZE, max_workers=NUMBER_THREADS, verbose=False)
+    _build_rotated_db_untargeted_chunks_parallel(gt_records, registry, orig_coll, rot_coll, batch_size=BATCH_SIZE, max_workers=NUMBER_THREADS, verbose=False)
 
     # Phase 2: Parallel query phase
     raw_results = run_query_phase_parallel(gt_records, cfg, registry, embedder, orig_coll, aug_coll, meta_coll, rot_coll, top_k, verbose=False)
 
+    save_results = RAW_RESULTS_FILE + f"_topk{top_k}"
     #save raw results into a pickle
-    if os.path.exists(RAW_RESULTS_FILE):
-        with open(RAW_RESULTS_FILE, "rb") as fh:
+    if os.path.exists(save_results):
+        with open(save_results, "rb") as fh:
             existing_results = pickle.load(fh)
     else:
         existing_results = []
     
     existing_results.extend(raw_results)
-    with open(RAW_RESULTS_FILE, 'wb') as f:
+    with open(save_results, 'wb') as f:
         pickle.dump(existing_results, f)
 
-    print(f"\n  ✅ Raw query results saved to {RAW_RESULTS_FILE}")
+    print(f"\n  ✅ Raw query results saved to {save_results}")
 
 
-    # Phase 3: Evaluation (unchanged)
-    eval_results = evaluate_results_parallel(raw_results, cfg, top_k, verbose=verbose)
-    save_timing_log(eval_results=eval_results)
-    return eval_results
+    # # Phase 3: Evaluation (unchanged)
+    # eval_results = evaluate_results_parallel(raw_results, cfg, top_k, verbose=verbose)
+    # save_timing_log(eval_results=eval_results)
+    # return eval_results
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Access-control embedding experiment (parallel)")

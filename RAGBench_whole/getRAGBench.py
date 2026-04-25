@@ -32,7 +32,7 @@ import json
 
 
 # # merge the 2 dataset together
-MAX_LENGTH  = 30
+MAX_LENGTH  = 500
 DATASET_NAME = "galileo-ai/ragbench"
 CONFIG_NAMES = ["covidqa", "msmarco"]
 desired_keys = [

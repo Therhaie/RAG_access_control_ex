@@ -8,5 +8,5 @@ plots/
 RAGBench_whole/*.json
 results_experiment_extra_dim/
 venv/
-
+*.pkl
 
