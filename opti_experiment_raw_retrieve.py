@@ -1046,6 +1046,10 @@ def _query_record_parallel_2(args):
     n_aug = max(1, aug_collection.count())
     n_meta = max(1, meta_collection.count())
     n_rot = max(1, rot_collection.count())
+    n_max = max(n_aug, n_meta, n_rot, top_k)
+    n_aug = n_max
+    n_meta = n_max
+    n_rot = n_max
 
     t0 = time.perf_counter()
     orig_res = orig_collection.query(
