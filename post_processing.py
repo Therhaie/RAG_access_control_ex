@@ -1,3 +1,143 @@
+from opti_experiment_raw_retrieve import RawQueryResults
+
+import os
+import pickle
+import json
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from dataclasses import astuple, fields
+from typing import List, Dict, Set, Optional
+from tqdm import tqdm
+import logging
+import warnings
+warnings.filterwarnings('ignore')
+
+# PATH_RAW_RESULTS = "results_experiment_extra_dim/185.pkl"
+# PATH_GROUND_TRUTH = "results_experiment_extra_dim/GT_results/ground_truth_"
+
+PATH_GROUND_TRUTH = os.path.join(os.getcwd(), "results_experiment_extra_dim", "GT_results")
+PATH_RAW_RESULTS = os.path.join(os.getcwd(), "results_experiment_extra_dim")
+PATH_ALL_CHUNKS = os.path.join(os.getcwd(), "RAGBench_whole", "list_chunks_id.json")
+
+# function to turn all list of ground truth into dict
+
+def turn_GT_list_to_dict(top_k):
+    gt_path = os.path.join(PATH_GROUND_TRUTH, f'ground_truth_{top_k}.json')
+    with open(gt_path, 'r') as f:
+        data_list = json.load(f)
+    # Convert to dict
+    ground_truth_dict_ = {item['id_triplets']: item for item in data_list}
+
+    # Save the dict as a JSON file with a dynamic filename
+    save_path = os.path.join(PATH_GROUND_TRUTH, f'ground_truth_dict_{top_k}.json')
+    with open(save_path, 'w') as f:
+        json.dump(ground_truth_dict_, f, indent=2)
+
+
+def load_ground_truths(ground_truth_file: str) -> Dict[str, Dict]:
+    """Load ground truth data from JSON file."""
+    with open(ground_truth_file, 'r') as f:
+        return json.load(f)
+
+def load_chunk_ids(chunk_list_file: str) -> Set[str]:
+    """Load all chunk IDs from text file."""
+    with open(chunk_list_file, 'r') as f:
+        return set(line.strip() for line in f)
+
+# def create_untargeted_chunk_set(all_chunk_ids: Set[str], targeted_chunks: List[str]) -> Set[str]:
+#     """Create a set of untargeted chunk IDs by excluding targeted chunks from all chunk IDs."""
+#     all_targeted_chunks = set()
+#     for element in targeted_chunks:
+#         liste = targeted_chunks[element]['targeted_chunk']
+#         set_liste = set(liste)
+#         all_targeted_chunks.update(set_liste)
+
+#     returna = set(all_chunk_ids) - all_targeted_chunks
+#     return returna
+
+def create_untargeted_chunk_set(all_chunk_ids: set, targeted_chunks: dict) -> set:
+    """
+    Create a set of untargeted chunk IDs by excluding all 'targeted_chunk' elements from all_chunk_ids.
+    """
+    all_targeted_chunks = set()
+    for value in targeted_chunks.values():
+        liste = value.get('targeted_chunk', [])  # get list or empty if missing
+        all_targeted_chunks.update(set(liste))
+    return set(all_chunk_ids) - all_targeted_chunks
+
+
+def process_raw_query_results(top_k,
+                              all_chunk_ids: Set[str]):
+    # Load the entire big pickle (needs enough RAM just this first time)
+    
+    path = PATH_RAW_RESULTS + f"/raw_results_topk{top_k}.pkl"
+    with open(path, "rb") as f:
+        raw_query_results = pickle.load(f)
+    
+    ground_truth = PATH_GROUND_TRUTH + f'/ground_truth_dict_{top_k}.json'
+    with open(ground_truth, 'r') as f:
+        ground_truth_data = json.load(f)
+
+    untargeted = create_untargeted_chunk_set(all_chunk_ids, ground_truth_data)
+    
+
+    for result in raw_query_results:
+        query_index = result.query_index # triplet_358
+        query_number = query_index.split("_")[-1]  # Extract the number part after the last underscore
+        targeted_chunks = ground_truth_data.get(query_index, {}).get('targeted_chunk', [])
+        
+        list_retrieved_meta_auth = result.list_retrieved_meta_auth
+        list_retrieved_meta_unauth = result.list_retrieved_meta_unauth
+        list_retrieved_rot_auth = result.list_retrieved_rot_auth
+        list_retrieved_rot_unauth = result.list_retrieved_rot_unauth
+        list_retrieved_aug_auth = result.list_retrieved_aug_auth
+        list_retrieved_aug_unauth = result.list_retrieved_aug_unauth
+
+
+        
+        # print(len(targeted_chunks))
+
+    
+
+    chunk_sim_retrieved_meta_auth = []
+    chunk_sim_retrieved_meta_unauth = []
+    chunk_sim_retrieved_rot_auth = []
+    chunk_sim_retrieved_rot_unauth = []
+    chunk_sim_retrieved_aug_auth = []
+    chunk_sim_retrieved_aug_unauth = []
+
+    # Filter by top_k
+
+
+if __name__ == "__main__":
+    # turn_GT_list_to_dict("results_experiment_extra_dim/GT_results")
+    list_k = np.unique(np.logspace(np.log10(1), np.log10(2000), num=100, dtype=int))
+    for k in list_k:
+        if k > 10:
+            turn_GT_list_to_dict(k)
+            with open(PATH_ALL_CHUNKS, 'r') as f:
+                all_chunk_ids = set(json.load(f))
+            # all_chunk_ids = load_chunk_ids("RAGBench_whole/all_chunk_ids.txt")
+            process_raw_query_results(k, all_chunk_ids=all_chunk_ids)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # import pickle
 # import numpy as np
 # import matplotlib.pyplot as plt
@@ -48,7 +188,7 @@
 
 
 
-# if __name__ == "__main__":
+
 
 #     # print(get_GT_query_index(358,10))
 
@@ -65,11 +205,7 @@
 #     #     grouped_values[top_k] = extract_values_for_top_k(raw_query_results, top_k)
 
 #         # Open the right GT file 
-from opti_experiment_raw_retrieve import RawQueryResults
 
-import os
-import pickle
-from collections import defaultdict
 
 # # Load the entire big pickle (needs enough RAM just this first time)
 # with open("raw_results.pkl", "rb") as f:
@@ -90,9 +226,13 @@ from collections import defaultdict
 #     print(f"Wrote {len(group)} items to {filename}")
 
 
-if __name__ == "__main__":
-    # Example of loading one of the new files
-    path = os.path.join("results_experiment_extra_dim", "raw_results_topk_10.pkl")
-    with open("results_experiment_extra_dim/raw_results_topk10.pkl", "rb") as f:
-        top_k_10_results = pickle.load(f)
-    print(f"Loaded {len(top_k_10_results)} results for top_k=10")
+
+
+# if __name__ == "__main__":
+#     # Example of loading one of the new files
+#     path = os.path.join("results_experiment_extra_dim", "raw_results_topk_10.pkl")
+#     with open("results_experiment_extra_dim/raw_results_topk10.pkl", "rb") as f:
+#         top_k_10_results = pickle.load(f)
+#     print(f"Loaded {len(top_k_10_results)} results for top_k=10")
+
+      
