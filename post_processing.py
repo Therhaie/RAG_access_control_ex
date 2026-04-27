@@ -65,24 +65,34 @@
 #     #     grouped_values[top_k] = extract_values_for_top_k(raw_query_results, top_k)
 
 #         # Open the right GT file 
+from opti_experiment_raw_retrieve import RawQueryResults
 
+import os
 import pickle
 from collections import defaultdict
 
-# Load the entire big pickle (needs enough RAM just this first time)
-with open("raw_results.pkl", "rb") as f:
-    raw_query_results = pickle.load(f)
+# # Load the entire big pickle (needs enough RAM just this first time)
+# with open("raw_results.pkl", "rb") as f:
+#     raw_query_results = pickle.load(f)
 
-# Group by top_k
-groups = defaultdict(list)
+# # Group by top_k
+# groups = defaultdict(list)
 
-for obj in raw_query_results:
-    # Assumes each obj has a .top_k attribute (may need to adapt for dict)
-    groups[obj.top_k].append(obj)
+# for obj in raw_query_results:
+#     # Assumes each obj has a .top_k attribute (may need to adapt for dict)
+#     groups[obj.top_k].append(obj)
 
-# Save each group as a separate pickle file
-for top_k, group in groups.items():
-    filename = f"raw_results_topk_{top_k}.pkl"
-    with open(filename, "wb") as f_out:
-        pickle.dump(group, f_out)
-    print(f"Wrote {len(group)} items to {filename}")
+# # Save each group as a separate pickle file
+# for top_k, group in groups.items():
+#     filename = f"raw_results_topk_{top_k}.pkl"
+#     with open(filename, "wb") as f_out:
+#         pickle.dump(group, f_out)
+#     print(f"Wrote {len(group)} items to {filename}")
+
+
+if __name__ == "__main__":
+    # Example of loading one of the new files
+    path = os.path.join("results_experiment_extra_dim", "raw_results_topk_10.pkl")
+    with open("results_experiment_extra_dim/raw_results_topk10.pkl", "rb") as f:
+        top_k_10_results = pickle.load(f)
+    print(f"Loaded {len(top_k_10_results)} results for top_k=10")
