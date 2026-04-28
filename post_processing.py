@@ -290,6 +290,16 @@ def process_raw_query_results(top_k,
     list_FAR_user_rot_auth = []
     list_FAR_user_aug_auth = []
 
+    list_UFAR_user_meta_auth = []
+    list_UFAR_user_rot_auth = []
+    list_UFAR_user_aug_auth = []
+
+    t_total_meta_auth = []
+    t_total_rot_auth = []
+    t_total_aug_auth = []
+    t_apply_rotation = []
+    t_apply_augmentation = []
+
     for result in raw_query_results:
         query_index = result.query_index # triplet_358
         user_index = result.user_index
@@ -378,12 +388,49 @@ def process_raw_query_results(top_k,
         list_FAR_user_aug_auth.append(len(FAR_user_aug_auth) / len(targeted_chunks) if targeted_chunks else 0)
 
         ### UFAR
+        dic_UFAR_user_meta_auth = {}
+        dic_UFAR_user_rot_auth = {}
+        dic_UFAR_user_aug_auth = {}
+        if user_index not in dic_UFAR_user_meta_auth:
+            dic_UFAR_user_meta_auth[user_index] = set(FAR_user_meta_auth)
+        else:
+            dic_UFAR_user_meta_auth[user_index].update(set(FAR_user_meta_auth))
+
+
+        if user_index not in dic_UFAR_user_rot_auth:
+            dic_UFAR_user_rot_auth[user_index] = set(FAR_user_rot_auth)
+        else:
+            dic_UFAR_user_rot_auth[user_index].update(set(FAR_user_rot_auth))
+        
+
+        if user_index not in dic_UFAR_user_aug_auth:
+            dic_UFAR_user_aug_auth[user_index] = set(FAR_user_aug_auth)
+        else:
+            dic_UFAR_user_aug_auth[user_index].update(set(FAR_user_aug_auth))
 
 
 
+        # list_UFAR_user_meta_auth.append(FAR_user_meta_auth)
+        # list_UFAR_user_rot_auth.append(FAR_user_rot_auth)
+        # list_UFAR_user_aug_auth.append(FAR_user_aug_auth)
 
 
+        ### Time metrics
+        t_total_rot_auth.append(result.t_embed_query_s + result.t_apply_rotation_s + result.t_query_rotated_s)
+        t_total_aug_auth.append(result.t_embed_query_s + result.t_augment_auth_s + result.t_query_aug_auth_s)
+        t_total_meta_auth.append(result.t_embed_query_s + result.t_query_orig_s)
+        t_apply_rotation.append(result.t_apply_rotation_s)
+        t_apply_augmentation.append(result.t_augment_auth_s)
 
+    ### UFAR per user
+    for user in dic_UFAR_user_meta_auth:
+        UFAR_user_meta_auth = dic_UFAR_user_meta_auth[user]
+        UFAR_user_rot_auth = dic_UFAR_user_rot_auth[user]
+        UFAR_user_aug_auth = dic_UFAR_user_aug_auth[user]
+
+        list_UFAR_user_meta_auth.append(len(UFAR_user_meta_auth) / len(dic_E_user[user]) if dic_E_user[user] else 0)
+        list_UFAR_user_rot_auth.append(len(UFAR_user_rot_auth) / len(dic_E_user[user]) if dic_E_user[user] else 0)
+        list_UFAR_user_aug_auth.append(len(UFAR_user_aug_auth) / len(dic_E_user[user]) if dic_E_user[user] else 0)
 
     
     # Average every AAR list
@@ -395,14 +442,58 @@ def process_raw_query_results(top_k,
     avg_AAP_rot_auth = np.mean(list_AAP_rot_auth)
     avg_AAP_aug_auth = np.mean(list_AAP_aug_auth)
 
-    avg_list_FAR_meta_auth = np.mean(list_FAR_meta_auth)
-    avg_list_FAR_rot_auth = np.mean(list_FAR_rot_auth)
-    avg_list_FAR_aug_auth = np.mean(list_FAR_aug_auth)
+    avg_FAR_meta_auth = np.mean(list_FAR_meta_auth)
+    avg_FAR_rot_auth = np.mean(list_FAR_rot_auth)
+    avg_FAR_aug_auth = np.mean(list_FAR_aug_auth)
 
-    avg_list_FAR_user_meta_auth = np.mean(list_FAR_user_meta_auth)
-    avg_list_FAR_user_rot_auth = np.mean(list_FAR_user_rot_auth)
-    avg_list_FAR_user_aug_auth = np.mean(list_FAR_user_aug_auth)
+    avg_FAR_user_meta_auth = np.mean(list_FAR_user_meta_auth)
+    avg_FAR_user_rot_auth = np.mean(list_FAR_user_rot_auth)
+    avg_FAR_user_aug_auth = np.mean(list_FAR_user_aug_auth)
 
+    avg_UFAR_user_meta_auth = np.mean(list_UFAR_user_meta_auth)
+    avg_UFAR_user_rot_auth = np.mean(list_UFAR_user_rot_auth)
+    avg_UFAR_user_aug_auth = np.mean(list_UFAR_user_aug_auth)
+
+    avg_t_total_rot_auth = np.mean(t_total_rot_auth)
+    avg_t_total_aug_auth = np.mean(t_total_aug_auth)
+    avg_t_total_meta_auth = np.mean(t_total_meta_auth)
+    avg_t_apply_rotation = np.mean(t_apply_rotation)
+    avg_t_apply_augmentation = np.mean(t_apply_augmentation)
+
+    # possibly later add the proportion of untargeted chunks retrieved
+
+
+    result_row = {
+        'top_k': int(top_k),  # Ensure it's a Python int
+        'avg_AAR_meta_auth': float(avg_AAR_meta_auth),
+        'avg_AAR_rot_auth': float(avg_AAR_rot_auth),
+        'avg_AAR_aug_auth': float(avg_AAR_aug_auth),
+        'avg_AAP_meta_auth': float(avg_AAP_meta_auth),
+        'avg_AAP_rot_auth': float(avg_AAP_rot_auth),
+        'avg_AAP_aug_auth': float(avg_AAP_aug_auth),
+        'avg_FAR_meta_auth': float(avg_FAR_meta_auth),
+        'avg_FAR_rot_auth': float(avg_FAR_rot_auth),
+        'avg_FAR_aug_auth': float(avg_FAR_aug_auth),
+        'avg_FAR_user_meta_auth': float(avg_FAR_user_meta_auth),
+        'avg_FAR_user_rot_auth': float(avg_FAR_user_rot_auth),
+        'avg_FAR_user_aug_auth': float(avg_FAR_user_aug_auth),
+        'avg_UFAR_user_meta_auth': float(avg_UFAR_user_meta_auth),
+        'avg_UFAR_user_rot_auth': float(avg_UFAR_user_rot_auth),
+        'avg_UFAR_user_aug_auth': float(avg_UFAR_user_aug_auth),
+        'avg_t_total_rot_auth': float(avg_t_total_rot_auth),
+        'avg_t_total_aug_auth': float(avg_t_total_aug_auth),
+        'avg_t_total_meta_auth': float(avg_t_total_meta_auth),
+        'avg_t_apply_rotation': float(avg_t_apply_rotation),
+        'avg_t_apply_augmentation': float(avg_t_apply_augmentation)
+    }
+
+
+    # results_path = "evaluation_summary.jsonl"
+    results_path = os.path.join(os.getcwd(), "evaluation_summary.jsonl")
+
+    # Append one line (creates file if not exists)
+    with open(results_path, 'a') as jsonl_file:
+        jsonl_file.write(json.dumps(result_row) + '\n')
 
 
     print(f"Top-k: {top_k}")
@@ -418,15 +509,20 @@ def process_raw_query_results(top_k,
 
     print("\n")
 
-    print(f"Average FAR Meta: {avg_list_FAR_meta_auth:.4f}")
-    print(f"Average FAR Rot: {avg_list_FAR_rot_auth:.4f}")
-    print(f"Average FAR Aug: {avg_list_FAR_aug_auth:.4f}")
+    print(f"Average FAR Meta: {avg_FAR_meta_auth:.4f}")
+    print(f"Average FAR Rot: {avg_FAR_rot_auth:.4f}")
+    print(f"Average FAR Aug: {avg_FAR_aug_auth:.4f}")
 
     print("\n")
 
-    print(f"Average FAR User Meta: {avg_list_FAR_user_meta_auth:.4f}")
-    print(f"Average FAR User Rot: {avg_list_FAR_user_rot_auth:.4f}")
-    print(f"Average FAR User Aug: {avg_list_FAR_user_aug_auth:.4f}")
+    print(f"Average FAR User Meta: {avg_FAR_user_meta_auth:.4f}")
+    print(f"Average FAR User Rot: {avg_FAR_user_rot_auth:.4f}")
+    print(f"Average FAR User Aug: {avg_FAR_user_aug_auth:.4f}")
+
+    print("\n")
+    print(f"Average UFAR User Meta: {avg_UFAR_user_meta_auth:.4f}")
+    print(f"Average UFAR User Rot: {avg_UFAR_user_rot_auth:.4f}")
+    print(f"Average UFAR User Aug: {avg_UFAR_user_aug_auth:.4f}")
 
 
     # Filter by top_k
@@ -436,7 +532,7 @@ if __name__ == "__main__":
     # turn_GT_list_to_dict("results_experiment_extra_dim/GT_results")
     list_k = np.unique(np.logspace(np.log10(1), np.log10(2000), num=100, dtype=int))
     for k in list_k:
-        if k >= 10 and k <11:
+        if k >= 12 and k <92:
             turn_GT_list_to_dict(k)
             with open(PATH_ALL_CHUNKS, 'r') as f:
                 all_chunk_ids = set(json.load(f))
