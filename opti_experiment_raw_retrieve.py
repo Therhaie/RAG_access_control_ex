@@ -1479,6 +1479,41 @@ def _query_record_parallel(args):
 ###################################################
 
 
+# def run_query_phase_parallel_with_pickle(
+#     gt_records: List[Dict],
+#     cfg: ExtraDimConfig,
+#     registry: RotationRegistry,
+#     embedder,
+#     orig_collection,
+#     aug_collection,
+#     meta_collection,
+#     rot_collection,
+#     top_k: int = DEFAULT_TOP_K,
+#     batch_size: int = 100,
+#     output_file: Path = RESULTS_DIR / "raw_results.pkl",
+#     verbose: bool = True,
+# ):
+#     output_file = RESULTS_DIR / f"raw_results_topk_{top_k}.pkl"
+#     output_file.parent.mkdir(parents=True, exist_ok=True)
+
+#     with open(output_file, 'wb') as f:  # Open in write mode
+#         with ThreadPoolExecutor(max_workers=NUMBER_THREADS) as executor:
+#             args_list = [
+#                 (record, idx % NUMBER_CLUSTER, cfg, registry, embedder, orig_collection, aug_collection, meta_collection, rot_collection, top_k)
+#                 for idx, record in enumerate(gt_records)
+#                 if record.get("id_triplets") and record.get("targeted_chunk")
+#             ]
+#             futures = [executor.submit(_query_record_parallel_2, args) for args in args_list]
+
+#             for future in as_completed(futures):
+#                 # Iterate over the generator and write each result directly
+#                 for result in future.result():
+#                     pickle.dump(result, f)
+#                     if verbose:
+#                         print(f"✅ Result saved to {output_file}")
+
+#     return output_file
+
 def run_query_phase_parallel_with_pickle(
     gt_records: List[Dict],
     cfg: ExtraDimConfig,
@@ -1490,29 +1525,47 @@ def run_query_phase_parallel_with_pickle(
     rot_collection,
     top_k: int = DEFAULT_TOP_K,
     batch_size: int = 100,
-    output_file: Path = RESULTS_DIR / "raw_results.pkl",
+    output_dir: Path = RESULTS_DIR / "batches",
     verbose: bool = True,
 ):
-    output_file = RESULTS_DIR / f"raw_results_topk_{top_k}.pkl"
-    output_file.parent.mkdir(parents=True, exist_ok=True)
+    # Create output directory if it doesn't exist
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    with open(output_file, 'wb') as f:  # Open in write mode
-        with ThreadPoolExecutor(max_workers=NUMBER_THREADS) as executor:
+    # Calculate the number of batches
+    valid_records = [
+        record for record in gt_records
+        if record.get("id_triplets") and record.get("targeted_chunk")
+    ]
+    num_batches = (len(valid_records) + batch_size - 1) // batch_size
+
+    # Process each batch in parallel
+    with ThreadPoolExecutor(max_workers=NUMBER_THREADS) as executor:
+        futures = []
+        for batch_idx in range(num_batches):
+            start_idx = batch_idx * batch_size
+            end_idx = start_idx + batch_size
+            batch_records = valid_records[start_idx:end_idx]
+
             args_list = [
-                (record, idx % NUMBER_CLUSTER, cfg, registry, embedder, orig_collection, aug_collection, meta_collection, rot_collection, top_k)
-                for idx, record in enumerate(gt_records)
-                if record.get("id_triplets") and record.get("targeted_chunk")
+                (record, idx % NUMBER_CLUSTER, cfg, registry, embedder,
+                 orig_collection, aug_collection, meta_collection, rot_collection, top_k)
+                for idx, record in enumerate(batch_records)
             ]
-            futures = [executor.submit(_query_record_parallel_2, args) for args in args_list]
 
-            for future in as_completed(futures):
-                # Iterate over the generator and write each result directly
-                for result in future.result():
-                    pickle.dump(result, f)
-                    if verbose:
-                        print(f"✅ Result saved to {output_file}")
+            # Submit batch processing
+            futures.append(executor.submit(
+                _query_record_parallel_2,
+                args_list,
+                output_dir,
+                batch_idx,
+                verbose
+            ))
 
-    return output_file
+        # Wait for all futures to complete
+        for future in as_completed(futures):
+            future.result()  # This will raise exceptions if any occurred
+
+    return output_dir
 
 
 

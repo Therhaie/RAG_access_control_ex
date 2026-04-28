@@ -7,7 +7,7 @@ source venv/bin/activate
 readarray -t values < <(python3 -c "import numpy as np; print('\n'.join(map(str, np.unique(np.logspace(np.log10(1), np.log10(2000), num=100, dtype=int)))))")
 
 NB_RUNS=1
-START_FROM=172
+START_FROM=127
 END_AT=2000
 echo "Generated values:"
 echo "${values[@]}"
