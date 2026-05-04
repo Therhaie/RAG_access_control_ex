@@ -5,8 +5,12 @@ chroma_rotated_db_log/
 experiment_chroma_db/
 logs/
 plots/
+plots_from_save_before/
 RAGBench_whole/*.json
 results_experiment_extra_dim/
+retrieval_metrics_results/
 venv/
 *.pkl
-
+*.jsonl
+*.json
+*.log
