@@ -13,6 +13,8 @@ from config import VLLM_EMBED_BASE_URL, VLLM_API_KEY, EMBED_MODEL
 from config import *
 from typing import List, Callable
 from security import *
+from argparse import ArgumentParser
+
 
 load_dotenv()
 
@@ -351,7 +353,7 @@ def ingest_function(path):
 
 
 
-def main():
+def main(create_vector_store_flag=False):
     # path_raw_data = os.path.join(os.getcwd(), 'documents_RAGBench', 'data.json')
     path_experimental_data = os.path.join(os.getcwd(), 'RAGBench_whole', 'merged_dataset.json')
     
@@ -362,13 +364,20 @@ def main():
     remove_duplicates_in_json(path_experimental_data, path_output)
     # print("end of the duplicate removal process")
     
-    # chunks  = load_file(path_output)
-    # vectore_store = create_vector_store(chunks)
+    if create_vector_store_flag:
+        chunks  = load_file(path_output)
+        vectore_store = create_vector_store(chunks)
     # print("\n ingestion completed")
     _check_vllm_health_1()
 
 if __name__ == "__main__":
-    main()
+    parser = ArgumentParser(description="Ingestion pipeline for RAGBench dataset")
+    parser.add_argument("--input", type=str, default=os.path.join(os.getcwd(), 'documents_RAGBench', 'merged_id_triplets2.json'), help="Path to the input JSON dataset")
+    parser.add_argument("--output", type=str, default=os.path.join(os.getcwd(),'documents_RAGBench_whole', 'merged_id_triplets_no_duplicates.json'), help="Path to save the output JSON dataset with duplicates removed")
+    parser.add_argument("--create_vector_store", default=False, help="Whether to create the ChromaDB vector store after processing the dataset")
+
+    args = parser.parse_args()
+    main(create_vector_store_flag=args.create_vector_store)
 
 
 

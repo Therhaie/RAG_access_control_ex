@@ -36,7 +36,7 @@ DEFAULT_LARGE_VAL_QUERY = DEFAULT_LARGE_VAL
 NUMBER_CLUSTER = 20
 DISTANCE_METRIC = "cosine"
 LOGS_DIR = Path("logs")
-RESULTS_DIR = Path("results_experiment_extra_dim")
+RESULTS_DIR = Path("results_experiment")
 RAW_RESULTS_FILE = RESULTS_DIR / "raw_results.pkl"
 
 GT_FILE = Path("RAGBench_whole/merged_id_triplets_with_metadata2.json")
@@ -51,6 +51,9 @@ META_CHROMA_BASE = os.path.join(os.getcwd(), "./chroma_meta_db_experiment")
 META_NAME = "meta_access_control_experiment"
 ROTATED_CHROMA      = os.path.join(os.getcwd(), "./chroma_rotated_db_log")
 ROTATED_COLLECTION  = "rotated_experiment"
+
+PATH_TIME_DATABASE_CREATION = os.path.join(os.getcwd(), "time_database_creation.jsonl")
+
 
 NUMBER_THREADS = 64
 BATCH_SIZE = 500
@@ -405,6 +408,16 @@ class RawQueryResults:
     timestamp: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
+
+
+    def append_to_jsonl(self, filename: str):
+        # Convert dataclass instance to a dictionary
+        as_dict = asdict(self)
+        # Serialize to JSON
+        as_json = json.dumps(as_dict)
+        # Write to file (append mode, creates if not exist)
+        with open(filename, "a", encoding="utf-8") as f:
+            f.write(as_json + "\n")
 
 
 
@@ -1396,144 +1409,6 @@ def _query_record_parallel(args):
     )
 
 
-
-# def run_query_phase_parallel_with_pickle(
-#     gt_records: List[Dict],
-#     cfg: ExtraDimConfig,
-#     registry: RotationRegistry,
-#     embedder,
-#     orig_collection,
-#     aug_collection,
-#     meta_collection,
-#     rot_collection,
-#     top_k: int = DEFAULT_TOP_K,
-#     batch_size: int = 100,
-#     output_file: Path = RESULTS_DIR / "raw_results.pkl",
-#     verbose: bool = True,
-# ):
-#     output_file = RESULTS_DIR / f"raw_results_topk_{top_k}.pkl"
-#     output_file.parent.mkdir(parents=True, exist_ok=True)
-#     results_processed = 0
-
-#     # Open the pickle file in append mode
-#     with open(output_file, 'ab') as f:
-#         for i in range(0, len(gt_records), batch_size):
-#             batch = gt_records[i:i + batch_size]
-#             args_list = [
-#                 (record, idx % NUMBER_CLUSTER, cfg, registry, embedder, orig_collection, aug_collection, meta_collection, rot_collection, top_k)
-#                 for idx, record in enumerate(batch)
-#                 if record.get("id_triplets") and record.get("targeted_chunk")
-#             ]
-
-#             # Process batch in parallel
-#             raw_results = []
-#             with ThreadPoolExecutor(max_workers=NUMBER_THREADS) as executor:
-#                 futures = [executor.submit(_query_record_parallel_2, args) for args in args_list]
-#                 for future in as_completed(futures):
-#                     raw_results.append(future.result())
-
-#             # Write batch to the same pickle file
-#             pickle.dump(raw_results, f)
-#             results_processed += len(raw_results)
-#             if verbose:
-#                 print(f"✅ Processed batch {i//batch_size}: {results_processed}/{len(gt_records)} results saved to {output_file}")
-
-#     return output_file
-
-
-
-# @timed("run_query_phase")
-# def run_query_phase_parallel(
-#     gt_records: List[Dict],
-#     cfg: ExtraDimConfig,
-#     registry: RotationRegistry,
-#     embedder,
-#     orig_collection,
-#     aug_collection,
-#     meta_collection,
-#     rot_collection,
-#     top_k: int = DEFAULT_TOP_K,
-#     verbose: bool = True,
-# ) -> List[RawQueryResults]:
-#     """
-#     Thread-based parallel query phase.
-#     """
-#     print(f"\n{'─' * 60}\n  Phase 2 — Query phase (parallel with threads) ({len(gt_records)} records, top-K={top_k})\n{'─' * 60}")
-
-#     # Prepare arguments for parallel processing
-#     args_list = [
-#         (record, i % NUMBER_CLUSTER, cfg, registry, embedder, orig_collection, aug_collection, meta_collection, rot_collection, top_k)
-#         for i, record in enumerate(gt_records)
-#         if record.get("id_triplets") and record.get("targeted_chunk")
-#     ]
-
-#     # Process queries in parallel using threads
-#     raw_results = []
-#     with ThreadPoolExecutor(max_workers=NUMBER_THREADS) as executor:
-#         futures = [executor.submit(_query_record_parallel_2, args) for args in args_list]
-#         for future in as_completed(futures):
-#             raw_results.append(future.result())
-
-#     return raw_results
-
-###################################################
-
-
-#########
-
-# def run_query_phase_parallel_with_pickle(
-#     gt_records: List[Dict],
-#     cfg: ExtraDimConfig,
-#     registry: RotationRegistry,
-#     embedder,
-#     orig_collection,
-#     aug_collection,
-#     meta_collection,
-#     rot_collection,
-#     top_k: int = DEFAULT_TOP_K,
-#     batch_size: int = 100,
-#     output_dir: Path = RESULTS_DIR / "batches",
-#     verbose: bool = True,
-# ):
-#     # Create output directory if it doesn't exist
-#     output_dir.mkdir(parents=True, exist_ok=True)
-
-#     # Calculate the number of batches
-#     valid_records = [
-#         record for record in gt_records
-#         if record.get("id_triplets") and record.get("targeted_chunk")
-#     ]
-#     num_batches = (len(valid_records) + batch_size - 1) // batch_size
-
-#     # Process each batch in parallel
-#     with ThreadPoolExecutor(max_workers=NUMBER_THREADS) as executor:
-#         futures = []
-#         for batch_idx in range(num_batches):
-#             start_idx = batch_idx * batch_size
-#             end_idx = start_idx + batch_size
-#             batch_records = valid_records[start_idx:end_idx]
-
-#             args_list = [
-#                 (record, idx % NUMBER_CLUSTER, cfg, registry, embedder,
-#                  orig_collection, aug_collection, meta_collection, rot_collection, top_k)
-#                 for idx, record in enumerate(batch_records)
-#             ]
-
-#             # Submit batch processing
-#             futures.append(executor.submit(
-#                 _query_record_parallel_2,
-#                 args_list,
-#                 output_dir,
-#                 batch_idx,
-#                 verbose
-#             ))
-
-#         # Wait for all futures to complete
-#         for future in as_completed(futures):
-#             future.result()  # This will raise exceptions if any occurred
-
-#     return output_dir
-
 ####### version with writting in sub batches to prevent memory overload
 def run_query_phase_parallel_batched(
     gt_records: List[Dict],
@@ -1549,7 +1424,7 @@ def run_query_phase_parallel_batched(
     output_file: Path = RESULTS_DIR / "raw_results.pkl",
     verbose: bool = True,
 ):
-    output_file = RESULTS_DIR / f"raw_results_hv_10_topk_{top_k}.pkl"
+    output_file = RESULTS_DIR / f"raw_results_topk_{top_k}.pkl"
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_file, 'wb') as f:  # Open in write mode
@@ -1834,13 +1709,55 @@ def run_experiment_parallel(
     registry = RotationRegistry(dim=dim)
 
     # Phase 1: Parallel DB construction
-    build_aug_db_parallel(gt_records, cfg, orig_coll, aug_coll, max_workers=NUMBER_THREADS, verbose=False)
-    build_meta_db_parallel(gt_records, orig_coll, meta_coll, max_workers=NUMBER_THREADS, verbose=False)
-    build_rotated_db_parallel(gt_records, registry, orig_coll, rot_coll, max_workers=NUMBER_THREADS, verbose=False)
+    # build_aug_db_parallel(gt_records, cfg, orig_coll, aug_coll, max_workers=NUMBER_THREADS, verbose=False)
+    # build_meta_db_parallel(gt_records, orig_coll, meta_coll, max_workers=NUMBER_THREADS, verbose=False)
+    # build_rotated_db_parallel(gt_records, registry, orig_coll, rot_coll, max_workers=NUMBER_THREADS, verbose=False)
 
-    _build_aug_db_all_untargeted_chunks_parallel(gt_records, cfg, orig_coll, aug_coll, batch_size=BATCH_SIZE, max_workers=NUMBER_THREADS, verbose=False)
-    build_meta_db_add_untargeted_chunks_parallel(gt_records, orig_coll, meta_coll, batch_size=BATCH_SIZE, max_workers=NUMBER_THREADS, verbose=False)
-    _build_rotated_db_untargeted_chunks_parallel(gt_records, registry, orig_coll, rot_coll, batch_size=BATCH_SIZE, max_workers=NUMBER_THREADS, verbose=False)
+    # _build_aug_db_all_untargeted_chunks_parallel(gt_records, cfg, orig_coll, aug_coll, batch_size=BATCH_SIZE, max_workers=NUMBER_THREADS, verbose=False)
+    # build_meta_db_add_untargeted_chunks_parallel(gt_records, orig_coll, meta_coll, batch_size=BATCH_SIZE, max_workers=NUMBER_THREADS, verbose=False)
+    # _build_rotated_db_untargeted_chunks_parallel(gt_records, registry, orig_coll, rot_coll, batch_size=BATCH_SIZE, max_workers=NUMBER_THREADS, verbose=False)
+
+    t0 = time.time()
+    build_aug_db_parallel(gt_records, cfg, orig_coll, aug_coll, verbose=False)
+    time_aug_db_creation = time.time() - t0
+    t0 = time.time()
+    build_meta_db_parallel(gt_records, orig_coll, meta_coll, verbose=False)
+    time_meta_db_creation = time.time() - t0
+    t0 = time.time()
+    build_rotated_db_parallel(gt_records, registry, orig_coll, rot_coll, verbose=False)
+    time_rot_db_creation = time.time() - t0
+
+    t0 = time.time()
+    _build_aug_db_all_untargeted_chunks_parallel(gt_records, cfg, orig_coll, aug_coll, verbose=False)
+    time_aug_db_creation_untargeted = time.time() - t0
+
+
+    t0 = time.time()
+    build_meta_db_add_untargeted_chunks_parallel(gt_records, orig_coll, meta_coll, verbose=False)
+    time_meta_db_creation_untargeted = time.time() - t0
+
+
+    t0 = time.time()
+    _build_rotated_db_untargeted_chunks_parallel(gt_records, registry, orig_coll, rot_coll, verbose=False)
+    time_rot_db_creation_untargeted = time.time() - t0
+
+    result_row = {
+        'top_k': top_k,
+        'time_aug_db_creation': time_aug_db_creation,
+        'time_meta_db_creation': time_meta_db_creation,
+        'time_rot_db_creation': time_rot_db_creation,
+        'time_aug_db_creation_untargeted': time_aug_db_creation_untargeted,
+        'time_meta_db_creation_untargeted': time_meta_db_creation_untargeted,
+        'time_rot_db_creation_untargeted':time_rot_db_creation_untargeted
+    }
+
+
+
+    # Append one line (creates file if not exists)
+    with open(PATH_TIME_DATABASE_CREATION, 'a') as jsonl_file:
+        jsonl_file.write(json.dumps(result_row) + '\n')
+
+
 
     # Phase 2: Parallel query phase
     # raw_results = run_query_phase_parallel_with_pickle(gt_records, cfg, registry, embedder, orig_coll, aug_coll, meta_coll, rot_coll, top_k, batch_size=BATCH_SIZE, verbose=True)
