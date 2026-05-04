@@ -31,7 +31,7 @@ from scipy.stats import ortho_group
 # Constants and paths (unchanged)
 
 DEFAULT_TOP_K = 20
-DEFAULT_LARGE_VAL = 1000
+DEFAULT_LARGE_VAL = 10
 DEFAULT_LARGE_VAL_QUERY = DEFAULT_LARGE_VAL 
 NUMBER_CLUSTER = 20
 DISTANCE_METRIC = "cosine"
@@ -1493,7 +1493,7 @@ def run_query_phase_parallel_with_pickle(
     output_file: Path = RESULTS_DIR / "raw_results.pkl",
     verbose: bool = True,
 ):
-    output_file = RESULTS_DIR / f"raw_results_topk_{top_k}.pkl"
+    output_file = RESULTS_DIR / f"raw_results_hv_10_topk_{top_k}.pkl"
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_file, 'wb') as f:  # Open in write mode

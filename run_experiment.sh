@@ -4,11 +4,12 @@
 source venv/bin/activate
 
 # Create a bash array using Python's logspace
-readarray -t values < <(python3 -c "import numpy as np; print('\n'.join(map(str, np.unique(np.logspace(np.log10(1), np.log10(2000), num=100, dtype=int)))))")
+# readarray -t values < <(python3 -c "import numpy as np; print('\n'.join(map(str, np.unique(np.logspace(np.log10(1), np.log10(2000), num=100, dtype=int)))))")
+readarray -t values < <(python3 -c "import numpy as np; print('\n'.join(map(str, np.unique(np.linspace(10, 120, num=80, dtype=int)))))")
 
 NB_RUNS=1
-START_FROM=172
-END_AT=2000
+START_FROM=11
+END_AT=126
 echo "Generated values:"
 echo "${values[@]}"
 
