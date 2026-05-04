@@ -299,6 +299,11 @@ def process_raw_query_results(top_k,
     t_total_aug_auth = []
     t_apply_rotation = []
     t_apply_augmentation = []
+    t_embed_query = []
+    t_orignal_query = []
+
+    t_all_rot = []
+    t_all_aug = []
 
     for result in raw_query_results:
         query_index = result.query_index # triplet_358
@@ -418,9 +423,14 @@ def process_raw_query_results(top_k,
         ### Time metrics
         t_total_rot_auth.append(result.t_embed_query_s + result.t_apply_rotation_s + result.t_query_rotated_s)
         t_total_aug_auth.append(result.t_embed_query_s + result.t_augment_auth_s + result.t_query_aug_auth_s)
-        t_total_meta_auth.append(result.t_embed_query_s + result.t_query_orig_s)
+        t_total_meta_auth.append(result.t_embed_query_s + result.t_query_meta_auth_s)
         t_apply_rotation.append(result.t_apply_rotation_s)
         t_apply_augmentation.append(result.t_augment_auth_s)
+        t_embed_query.append(result.t_embed_query_s)
+        t_orignal_query.append(result.t_query_orig_s)
+
+        t_all_rot.append(result.t_apply_rotation_s)
+        t_all_aug.append(result.t_augment_auth_s)
 
     ### UFAR per user
     for user in dic_UFAR_user_meta_auth:
@@ -484,7 +494,9 @@ def process_raw_query_results(top_k,
         'avg_t_total_aug_auth': float(avg_t_total_aug_auth),
         'avg_t_total_meta_auth': float(avg_t_total_meta_auth),
         'avg_t_apply_rotation': float(avg_t_apply_rotation),
-        'avg_t_apply_augmentation': float(avg_t_apply_augmentation)
+        'avg_t_apply_augmentation': float(avg_t_apply_augmentation),
+        't_all_rot': t_all_rot,
+        't_all_aug': t_all_aug
     }
 
 
@@ -532,8 +544,9 @@ if __name__ == "__main__":
     # turn_GT_list_to_dict("results_experiment_extra_dim/GT_results")
     list_k = np.unique(np.logspace(np.log10(1), np.log10(2000), num=100, dtype=int))
     for k in list_k:
-        if k >= 12 and k <92:
-            turn_GT_list_to_dict(k)
+        # if k >= 12 and k <92:
+        if k >=10 and k<=126:
+            # turn_GT_list_to_dict(k)
             with open(PATH_ALL_CHUNKS, 'r') as f:
                 all_chunk_ids = set(json.load(f))
             # all_chunk_ids = load_chunk_ids("RAGBench_whole/all_chunk_ids.txt")

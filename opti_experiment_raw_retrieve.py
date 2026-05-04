@@ -1514,7 +1514,63 @@ def _query_record_parallel(args):
 
 #     return output_file
 
-def run_query_phase_parallel_with_pickle(
+#########
+
+# def run_query_phase_parallel_with_pickle(
+#     gt_records: List[Dict],
+#     cfg: ExtraDimConfig,
+#     registry: RotationRegistry,
+#     embedder,
+#     orig_collection,
+#     aug_collection,
+#     meta_collection,
+#     rot_collection,
+#     top_k: int = DEFAULT_TOP_K,
+#     batch_size: int = 100,
+#     output_dir: Path = RESULTS_DIR / "batches",
+#     verbose: bool = True,
+# ):
+#     # Create output directory if it doesn't exist
+#     output_dir.mkdir(parents=True, exist_ok=True)
+
+#     # Calculate the number of batches
+#     valid_records = [
+#         record for record in gt_records
+#         if record.get("id_triplets") and record.get("targeted_chunk")
+#     ]
+#     num_batches = (len(valid_records) + batch_size - 1) // batch_size
+
+#     # Process each batch in parallel
+#     with ThreadPoolExecutor(max_workers=NUMBER_THREADS) as executor:
+#         futures = []
+#         for batch_idx in range(num_batches):
+#             start_idx = batch_idx * batch_size
+#             end_idx = start_idx + batch_size
+#             batch_records = valid_records[start_idx:end_idx]
+
+#             args_list = [
+#                 (record, idx % NUMBER_CLUSTER, cfg, registry, embedder,
+#                  orig_collection, aug_collection, meta_collection, rot_collection, top_k)
+#                 for idx, record in enumerate(batch_records)
+#             ]
+
+#             # Submit batch processing
+#             futures.append(executor.submit(
+#                 _query_record_parallel_2,
+#                 args_list,
+#                 output_dir,
+#                 batch_idx,
+#                 verbose
+#             ))
+
+#         # Wait for all futures to complete
+#         for future in as_completed(futures):
+#             future.result()  # This will raise exceptions if any occurred
+
+#     return output_dir
+
+####### version with writting in sub batches to prevent memory overload
+def run_query_phase_parallel_batched(
     gt_records: List[Dict],
     cfg: ExtraDimConfig,
     registry: RotationRegistry,
@@ -1525,49 +1581,37 @@ def run_query_phase_parallel_with_pickle(
     rot_collection,
     top_k: int = DEFAULT_TOP_K,
     batch_size: int = 100,
-    output_dir: Path = RESULTS_DIR / "batches",
+    output_dir: Path = RESULTS_DIR,
     verbose: bool = True,
 ):
-    # Create output directory if it doesn't exist
     output_dir.mkdir(parents=True, exist_ok=True)
+    batch_files = []
+    results_processed = 0
 
-    # Calculate the number of batches
-    valid_records = [
-        record for record in gt_records
-        if record.get("id_triplets") and record.get("targeted_chunk")
-    ]
-    num_batches = (len(valid_records) + batch_size - 1) // batch_size
+    for i in range(0, len(gt_records), batch_size):
+        batch = gt_records[i:i + batch_size]
+        args_list = [
+            (record, idx % NUMBER_CLUSTER, cfg, registry, embedder, orig_collection, aug_collection, meta_collection, rot_collection, top_k)
+            for idx, record in enumerate(batch)
+            if record.get("id_triplets") and record.get("targeted_chunk")
+        ]
 
-    # Process each batch in parallel
-    with ThreadPoolExecutor(max_workers=NUMBER_THREADS) as executor:
-        futures = []
-        for batch_idx in range(num_batches):
-            start_idx = batch_idx * batch_size
-            end_idx = start_idx + batch_size
-            batch_records = valid_records[start_idx:end_idx]
+        raw_results = []
+        with ThreadPoolExecutor(max_workers=NUMBER_THREADS) as executor:
+            futures = [executor.submit(_query_record_parallel_2, args) for args in args_list]
+            for future in as_completed(futures):
+                raw_results.append(future.result())
 
-            args_list = [
-                (record, idx % NUMBER_CLUSTER, cfg, registry, embedder,
-                 orig_collection, aug_collection, meta_collection, rot_collection, top_k)
-                for idx, record in enumerate(batch_records)
-            ]
+        # Write batch to disk
+        batch_file = output_dir / f"raw_results_batch_{i//batch_size}.pkl"
+        with open(batch_file, 'wb') as f:
+            pickle.dump(raw_results, f)
+        batch_files.append(batch_file)
+        results_processed += len(raw_results)
+        if verbose:
+            print(f"✅ Processed batch {i//batch_size}: {results_processed}/{len(gt_records)} results saved to {batch_file}")
 
-            # Submit batch processing
-            futures.append(executor.submit(
-                _query_record_parallel_2,
-                args_list,
-                output_dir,
-                batch_idx,
-                verbose
-            ))
-
-        # Wait for all futures to complete
-        for future in as_completed(futures):
-            future.result()  # This will raise exceptions if any occurred
-
-    return output_dir
-
-
+    return batch_files
 
 
 # --- Evaluation phase ---
