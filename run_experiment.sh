@@ -8,8 +8,8 @@ source venv/bin/activate
 readarray -t values < <(python3 -c "import numpy as np; print('\n'.join(map(str, np.unique(np.linspace(10, 120, num=80, dtype=int)))))")
 
 NB_RUNS=1
-START_FROM=11
-END_AT=126
+START_FROM=127
+END_AT=2000
 echo "Generated values:"
 echo "${values[@]}"
 
