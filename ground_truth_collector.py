@@ -75,9 +75,7 @@ def _chunk_key(chunk: dict) -> str:
     the metadata stored during ingestion.
     """
     return f"{chunk.get('source','?')}|{chunk.get('page','?')}|{chunk.get('phrase_seq','?')}"
-    # return f"{chunk.get('triplet_index','?')}|{chunk.get('document_id','?')}|{chunk.get('phrase_seq','?')}"
-    # return f"{chunk.get('source','?')}|{chunk.get('page','?')}|{chunk.get('phrase_seq','?')}"
-    # can also return the 'bge_score' 
+
 
 def collect_stable_chunks(
     question: str,

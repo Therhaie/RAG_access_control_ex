@@ -72,35 +72,35 @@ def fetch_embeddings(
     embeddings = []
     for chunk_id in chunk_ids:
         # Parse chunk_id (format: "triplet_index|document_id|phrase_seq")
-        triplet_index = str(chunk_id.split("|")[0])
-        document_id = str(chunk_id.split("|")[1])
-        phrase_seq = str(chunk_id.split("|")[2])
+        triplet_index, document_id, phrase_seq = str(chunk_id.split("|"))
+
         
         chroma_id = f"{triplet_index}_{document_id}_{phrase_seq}"
-        if collection_path == DIRECTORY_ROTATION_DB :
-            result = collection.get(ids=[chroma_id], include=["embeddings"])
-        if collection_path == DIRECTORY_AUGMENTED_DB:
-            result = collection.get(
-                where={
-                    "$and": [
-                        {"triplet_index": {"$eq": triplet_index}},
-                        {"document_id":   {"$eq": document_id}},
-                        {"phrase_seq":    {"$eq": phrase_seq}},
-                    ]
-                },
-                include=["embeddings"],
-            )
-        elif collection_path == DIRECTORY_BASELINE_DB:
-            result = collection.get(
-                where={
-                    "$and": [
-                        {"triplet_index": {"$eq": triplet_index}},
-                        {"document_id":   {"$eq": document_id}},
-                        {"phrase_seq":    {"$eq": phrase_seq}},
-                    ]
-                },
-                include=["embeddings"],
-            )
+        result = collection.get(ids=[chroma_id], include=["embeddings"])
+        # if collection_path == DIRECTORY_ROTATION_DB :
+        #     result = collection.get(ids=[chroma_id], include=["embeddings"])
+        # if collection_path == DIRECTORY_AUGMENTED_DB:
+        #     result = collection.get(
+        #         where={
+        #             "$and": [
+        #                 {"triplet_index": {"$eq": triplet_index}},
+        #                 {"document_id":   {"$eq": document_id}},
+        #                 {"phrase_seq":    {"$eq": phrase_seq}},
+        #             ]
+        #         },
+        #         include=["embeddings"],
+        #     )
+        # elif collection_path == DIRECTORY_BASELINE_DB:
+        #     result = collection.get(
+        #         where={
+        #             "$and": [
+        #                 {"triplet_index": {"$eq": triplet_index}},
+        #                 {"document_id":   {"$eq": document_id}},
+        #                 {"phrase_seq":    {"$eq": phrase_seq}},
+        #             ]
+        #         },
+        #         include=["embeddings"],
+        #     )
 
         if len(result["embeddings"][0]) > 0:
             embeddings.append(result["embeddings"][0])

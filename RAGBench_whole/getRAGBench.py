@@ -3,31 +3,6 @@ import json
 from argparse import ArgumentParser
 
 
-# def remove_duplicates_by_sentence_content(input_path, output_path):
-#     with open(input_path, 'r', encoding='utf-8') as f:
-#         data = json.load(f)
-
-#     seen_contents = set()
-
-#     # Assuming root structure is: { "sentences": [ [sentence, ...], ... ] }
-#     unique_sentences = []
-
-#     for doc in data:
-#         document = doc["sentences"]
-#         new_document = []
-#         for sentences in document:
-#             for sentence in sentences:
-#                 content = sentence[-1]  # content is always at index 1
-#                 if content not in seen_contents:
-#                     seen_contents.add(content)
-#                     new_document.append(sentence)
-#             unique_sentences.append(new_document)
-
-#     # Write output preserving the original structure
-#     with open(output_path, 'w', encoding='utf-8') as f:
-#         json.dump({"sentences": unique_sentences}, f, ensure_ascii=False, indent=2)
-
-
 
 def remove_duplicates_by_sentence_content(input_path, output_path):
     with open(input_path, 'r', encoding='utf-8') as f:
@@ -37,16 +12,16 @@ def remove_duplicates_by_sentence_content(input_path, output_path):
         seen_contents = set()
         # doc["sentences"] is a list of lists (documents)
         new_documents = []
-        for sentences in doc["sentences"]:
-            new_sentences = []
+        new_sentences = []
+        for sentences in doc["sentences"]: 
             for sentence in sentences:
                 content = sentence[1]  # sentence text is always at index 1
                 if content not in seen_contents:
                     seen_contents.add(content)
                     new_sentences.append(sentence)
-            if new_sentences:
-                new_documents.append(new_sentences)
-        doc["sentences"] = new_documents
+        # if new_sentences:
+        new_documents.append(new_sentences)
+        doc["sentences"] = new_documents[0]
 
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
@@ -54,6 +29,7 @@ def remove_duplicates_by_sentence_content(input_path, output_path):
 
 def main(MAX_LENGTH=100):
     all_data = []
+    id_triplet_set = set()  # To track unique id_triplets
 
     for config_name in CONFIG_NAMES:
         dataset = load_dataset(DATASET_NAME, config_name, split="train")
@@ -63,13 +39,19 @@ def main(MAX_LENGTH=100):
         ]
         
         for i, item in enumerate(filtered_data[:MAX_LENGTH]):
-            item["id_triplets"] = dataset["id"][i]
+
+            if item["id"] in id_triplet_set:
+                item["id_triplets"] = dataset["id"][i] + str(1)
+                id_triplet_set.add(item["id"] + str(1))
+              
+            else:
+                id_triplet_set.add(item["id"])
+                item["id_triplets"] = dataset["id"][i]
             item["sentences"] = dataset["documents_sentences"][i]
 
             item.pop("id", None)
             item.pop("documents_sentences", None)
-        # for data in dataset["id"]:
-        #     data.pop("id", None)
+
         all_data.extend(filtered_data[:MAX_LENGTH])
 
     # Now all_data contains all your merged/filtered datapoints

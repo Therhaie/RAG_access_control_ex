@@ -4,7 +4,7 @@ SESSION_NAME="mysession"
 LAUNCH_EMBEDDING_SERVER_SCRIPT="$(pwd)/start_embedding_server.sh"
 
 NB_RUNS=1 # for ground_truth_collector.py
-START_FROM=1
+START_FROM=10
 END_AT=2000
 NUMBER_QUERIES=30
 NAME_LOG_FILE="experiment_log_$(date +%Y%m%d_%H%M%S).log"
@@ -75,12 +75,14 @@ do
 
     python nuclear_cleanup.py
 
+    cp RAGBench_whole/merged_dataset.json RAGBench_whole/merged_id_triplets_no_duplicates.json
+
     
-    start=$(date +%s.%N)
-    python ingestion_pipeline.py --create_vector_store False >> "$NAME_LOG_FILE" 2>&1
-    end=$(date +%s.%N)
-    duration=$(echo "$end - $start" | bc)
-    echo "ingestion_pipeline.py took $duration seconds" | tee -a "$NAME_LOG_FILE"
+    # start=$(date +%s.%N)
+    # python ingestion_pipeline.py --create_vector_store False >> "$NAME_LOG_FILE" 2>&1
+    # end=$(date +%s.%N)
+    # duration=$(echo "$end - $start" | bc)
+    # echo "ingestion_pipeline.py took $duration seconds" | tee -a "$NAME_LOG_FILE"
     
     # 1. ground_truth_collector.py
     start=$(date +%s.%N) 
@@ -108,10 +110,10 @@ do
     python save_ground_truth.py --top-k $val
 
 
-    # rm -rf RAGBench_whole/merged_id_triplets_no_duplicates.json
-    # rm -rf RAGBench_whole/merged_id_triplets_with_metadata2.json
-    # rm -rf RAGBench_whole/ground_truth_retrievals.json
-    # killall screen
+    rm -rf RAGBench_whole/merged_id_triplets_no_duplicates.json
+    rm -rf RAGBench_whole/merged_id_triplets_with_metadata2.json
+    rm -rf RAGBench_whole/ground_truth_retrievals.json
+
 
     
     echo "--------------------------------------------"
