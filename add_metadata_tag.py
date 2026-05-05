@@ -16,8 +16,16 @@
 import json
 import os
 import time
+import argparse
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Embedding cluster visualization experiment control.")
+    parser.add_argument("--nb-users", type=int, default=20, help="Number of users to consider")
+    return parser.parse_args()
+
 # Load the ground truth retrievals
 def main():
+    args = parse_args()
     with open("RAGBench_whole/ground_truth_retrievals.json", encoding="utf-8") as fh:
         ground_truth_data = json.load(fh)
 
@@ -77,7 +85,7 @@ def main():
 
     # To append "reached_chunk" to the json file for the "optimal scenario", append all the chunks reach by a query  
 
-    for entries in ground_truth_data:
+    for  entries in ground_truth_data:
 
         triplet_index_orig_query = entries.get("triplet_index")
 
@@ -94,27 +102,14 @@ def main():
             # entries["reached_chunk"].append(chunk_identifier)
 
             # need to find the query associated in merged_data with the same triplet_index and add chunk_identifier
-            for chunk in merged_data:
+            for i, chunk in enumerate(merged_data):
+                chunk["user_number"] = int(i % args.nb_users) 
                 if chunk.get("id_triplets") == triplet_index_orig_query:     
                     if "reached_chunk" not in chunk:
                         chunk["reached_chunk"] = []
                     chunk["reached_chunk"].append(chunk_identifier)
                     break
                     
-
-            #         break  # Stop after finding the first match
-
-
-            # for doc in merged_data:
-            #     doc_triplet_index = doc.get("id_triplets")
-            #     for sentence in doc.get("sentences", []):
-            #         identifier_sentence = f"{doc_triplet_index}|{sentence[0]}"
-            #         if chunk_identifier == identifier_sentence:
-            #             sentence.append(doc.get("id_triplets"))
-            #             break  # Stop after finding the first 
-            #     if chunk_identifier == identifier_sentence:
-            #         break # break the second for loop
-
 
 
     # After all processing and modifications are complete, save to a new file

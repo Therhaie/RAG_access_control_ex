@@ -26,10 +26,10 @@ from plot_PCA import get_all_chunk_ids, get_list_id_targeted_chunk
 
 # --- Constants (configurable via CLI) ---
 LOGS_DIR = Path("logs")
-RESULTS_DIR = Path("results_experiment")
+RESULTS_DIR = Path(os.path.join(os.getcwd(), "results_experiment"))
 GT_FILE = Path("RAGBench_whole/merged_id_triplets_with_metadata2.json")
 PATH_TIME_DATABASE_CREATION = Path("time_database_creation.jsonl")
-
+os.makedirs(LOGS_DIR, exist_ok=True)
 # --- Logging ---
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -938,6 +938,7 @@ def run_query_phase_parallel_batched(
             for future in as_completed(futures):
                 for result in future.result():
                     f.write(json.dumps(result.to_json_dict()) + '\n')
+                    print(f"Saved results for query {result.query_index} (user {result.user_index})", flush=True)
                     if verbose:
                         logger.info(f"✅ Result saved to {output_file}")
     return output_file

@@ -47,24 +47,6 @@ def get_all_chunk_ids(data) -> List[str]:
             chunk_ids.append(f"{id_triplet}|{sentence[0][-2]}|{sentence[0][-1]}")
     return chunk_ids
 
-# def get_list_id_targeted_chunk(data) -> List[str]:
-#     """Extract all targeted chunk ids from the data, in the format "triplet_index|document_id|phrase_seq"."""
-#     list_of_chunk_ids = []
-#     for chunk in data:
-#         for chunk_id in chunk.get("targeted_chunk", []):
-#             if f'{chunk_id.split("|")[0]}|{chunk_id[-2]}|{chunk_id[-1]}' not in list_of_chunk_ids:
-#                 list_of_chunk_ids.append(f'{chunk_id.split("|")[0]}|{chunk_id[-2]}|{chunk_id[-1]}')
-#     return list_of_chunk_ids
-
-#new version of the functions with the change for th encoding format
-# def get_all_chunk_ids(data) -> List[str]:
-#     """Extract all chunk ids from the data, in the format "triplet_index|document_id|phrase_seq"."""
-#     chunk_ids : List[str] = []
-#     for chunk in data:
-#         id_triplet = chunk.get("id_triplets", "")
-#         for sentence in chunk.get("sentences", []):
-#             chunk_ids.append(sentence)
-#     return chunk_ids
 
 def get_list_id_targeted_chunk(data) -> List[str]:
     """Extract all targeted chunk ids from the data, in the format "triplet_index|document_id|phrase_seq"."""
@@ -74,33 +56,6 @@ def get_list_id_targeted_chunk(data) -> List[str]:
             if chunk_id not in list_of_chunk_ids:
                 list_of_chunk_ids.append(chunk_id)
     return list_of_chunk_ids
-
-
-
-# for the embedding
-# def _l2_norm(v: np.ndarray) -> np.ndarray:
-#     n = np.linalg.norm(v)
-#     return v / n if n > 1e-10 else v
-
-# def augment_query(
-#     base_vec:    np.ndarray,
-#     cfg:         ExtraDimConfig,
-#     query_index: int,
-#     authorised:  bool,
-# ) -> np.ndarray:
-#     """
-#     Append N extra dims to a query vector.
-#     authorised=True  → slot[query_index] = large_value  (aligns with own chunks)
-#     authorised=False → all-zero extra dims               (diverges from own chunks)
-#     """
-#     extra = np.zeros(cfg.n_queries, dtype=np.float32)
-#     # extra.fill(DEFAULT_LARGE_VAL)
-#     if authorised:
-#         # extra[query_index] = cfg.large_value
-#         extra[query_index] = DEFAULT_LARGE_VAL
-
-#     aug = np.concatenate([base_vec.astype(np.float32), extra])
-#     return _l2_norm(aug) if cfg.normalize_after else aug
 
 
 
@@ -123,18 +78,19 @@ def get_id_clusters(data) :
         cluster = []
         questions.append(chunk.get("question", ""))
         for targeted_chunk in chunk.get("targeted_chunk", []):
+            # cluster.append(f'{targeted_chunk.split("|")[0]}|{targeted_chunk[-2]}|{targeted_chunk[-1]}')
             cluster.append(f'{targeted_chunk.split("|")[0]}|{targeted_chunk[-2]}|{targeted_chunk[-1]}')
         clusters.append(cluster)
     selected_indices = random.sample(range(len(clusters)), NUMBER_OF_CLUSTERS_DISPLAYED)
     return [clusters[i] for i in selected_indices], [questions[i] for i in selected_indices]
             
 
-# Extract targeted chunks (e.g., for a specific query)
-def get_targeted_chunks(query_id: str) -> List[str]:
-    for record in data:
-        if record["id_triplets"] == query_id:
-            return record.get("targeted_chunk", [])
-    return []
+# # Extract targeted chunks (e.g., for a specific query)
+# def get_targeted_chunks(query_id: str) -> List[str]:
+#     for record in data:
+#         if record["id_triplets"] == query_id:
+#             return record.get("targeted_chunk", [])
+#     return []
 
 # Fetch embeddings from ChromaDB
 def fetch_embeddings(

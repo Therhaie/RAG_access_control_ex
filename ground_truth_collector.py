@@ -168,6 +168,7 @@ def run_collection(
 
     records: list[dict] = []
 
+
     # Version without the for loop to iterate on the sentences of the dataset
     for i, entry in enumerate(dataset, 1):
         # for question in entry["sentences"]:
@@ -202,37 +203,6 @@ def run_collection(
             f"(from {top_k} retrieved × {n_runs} runs)  "
             f"[{record['elapsed_s']}s]\n")
     
-    # for i, entry in enumerate(dataset, 1):
-    #     question      = entry["question"]
-    #     triplet_index = str(entry.get("triplet_index", entry.get("id", i)))
-    #     query_id      = f"triplet_{triplet_index}"
-
-    #     print(f"[{i}/{len(dataset)}] {query_id}  Q: {question[:70]}…")
-    #     t0 = time.time()
-
-    #     stable = collect_stable_chunks(
-    #         question  = question,
-    #         n_runs    = n_runs,
-    #         threshold = threshold,
-    #         top_k     = top_k,
-    #         verbose   = verbose,
-    #     )
-
-    #     record = {
-    #         "query_id":      query_id,
-    #         "question":      question,
-    #         "triplet_index": triplet_index,
-    #         "ground_truth":  entry.get("ground_truth", ""),
-    #         "runs":          n_runs,
-    #         "threshold":     threshold,
-    #         "stable_chunks": stable,
-    #         "elapsed_s":     round(time.time() - t0, 2),
-    #     }
-    #     records.append(record)
-
-    #     print(f"  → {len(stable)} stable chunks  "
-    #           f"(from {top_k} retrieved × {n_runs} runs)  "
-    #           f"[{record['elapsed_s']}s]\n")
 
     # ── Persist ───────────────────────────────────────────────────────────────
     with open(OUTPUT_FILE, "w", encoding="utf-8") as fh:

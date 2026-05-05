@@ -6,7 +6,7 @@ from datetime import datetime
 
 # 1. Nuclear cleanup
 def nuclear_cleanup():
-    for pattern in ["./chroma_*", "./experiment_chroma_db", "./results_experiment", "./logs"]:
+    for pattern in ["./chroma_*", "./experiment_chroma_db"]:
         for match in glob.glob(pattern, recursive=True):
             if os.path.exists(match):
                 shutil.rmtree(match, ignore_errors=True)

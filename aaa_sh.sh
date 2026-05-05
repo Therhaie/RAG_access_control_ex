@@ -9,6 +9,7 @@ END_AT=2000
 NUMBER_QUERIES=30
 NAME_LOG_FILE="experiment_log_$(date +%Y%m%d_%H%M%S).log"
 NEED_RECREATE_VECTOR_STORE="False"
+NB_USERS=20
 
 
 
@@ -43,7 +44,7 @@ sleep 20 # wait for the server to start
 mapfile -t values < <(python3 -c "import numpy as np; print('\n'.join(map(str, np.unique(np.linspace(10, 120, num=80, dtype=int)))))" )
 
 
-if (( NEED_RECREATE_VECTOR_STORE == "True" )); then
+if [[ "$NEED_RECREATE_VECTOR_STORE" == "True" ]]; then
     # create the dataset
     echo "get RAGBench.py is running..."
     python RAGBench_whole/getRAGBench.py --max_length $NUMBER_QUERIES #>> "$NAME_LOG_FILE" 2>&1
@@ -91,14 +92,14 @@ do
 
     # add metadata (reached_chunks and targeted_chunks)
     start=$(date +%s.%N)
-    python add_metadata_tag.py >> "$NAME_LOG_FILE" 2>&1
+    python add_metadata_tag.py --nb-users $NB_USERS >> "$NAME_LOG_FILE" 2>&1
     end=$(date +%s.%N)
     duration=$(echo "$end - $start" | bc)
     echo "add_metadata_tag.py took $duration seconds" | tee -a "$NAME_LOG_FILE"
 
     ### experiment extra dimension optimized raw retrieved
     start=$(date +%s.%N)
-    python opti_experiment_raw_retrieve_copy.py --top-k $val --workers 64 --quiet >> "$NAME_LOG_FILE" 2>&1
+    python opti_experiment_raw_retrieve_copy.py --top-k $val --workers 64 >> "$NAME_LOG_FILE" 2>&1
     end=$(date +%s.%N)
     duration=$(echo "$end - $start" | bc)
     echo "opti_experiment_raw_retrieve_copy.py took $duration seconds" | tee -a "$NAME_LOG_FILE"
@@ -107,10 +108,10 @@ do
     python save_ground_truth.py --top-k $val
 
 
-    rm -rf RAGBench_whole/merged_id_triplets_no_duplicates.json
-    rm -rf RAGBench_whole/merged_id_triplets_with_metadata2.json
-    rm -rf RAGBench_whole/ground_truth_retrievals.json
-    killall screen
+    # rm -rf RAGBench_whole/merged_id_triplets_no_duplicates.json
+    # rm -rf RAGBench_whole/merged_id_triplets_with_metadata2.json
+    # rm -rf RAGBench_whole/ground_truth_retrievals.json
+    # killall screen
 
     
     echo "--------------------------------------------"
