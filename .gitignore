@@ -1,4 +1,5 @@
 __pycache__/
+.vscode/
 chroma_extra_dim_experiment/
 chroma_meta_db_experiment/
 chroma_rotated_db_log/

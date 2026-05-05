@@ -12,7 +12,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from matplotlib.colors import ListedColormap
 from sklearn.manifold import TSNE
 import umap.umap_ as umap
-
+from collections import defaultdict
 
 def get_all_chunk_ids(data) -> List[str]:
     """Extract all chunk ids from the data, in the format "triplet_index|document_id|phrase_seq"."""
@@ -43,19 +43,45 @@ def get_id_untargeted_chunk(data, n_untargeted_chunks_displayed=10) -> List[str]
             untargeted_chunks.append(chunk_id)
     return np.random.choice(untargeted_chunks, size=min(n_untargeted_chunks_displayed, len(untargeted_chunks)), replace=False).tolist()
 
-def get_id_clusters(data, n_user_displayed=5) :
+# def get_id_clusters(data, n_user_displayed=5) :
+#     """Give the id of NUMBER_OF_CLUSTERS_DISPLAYED targeted chunks cluster using the SEED, """
+#     clusters = []
+#     questions : list[str] = []
+#     for chunk in data:
+#         cluster = []
+#         questions.append(chunk.get("question", ""))
+#         for targeted_chunk in chunk.get("targeted_chunk", []):
+#             cluster.append(f'{targeted_chunk.split("|")[0]}|{targeted_chunk[-2]}|{targeted_chunk[-1]}')
+#         clusters.append(cluster)
+#     selected_indices = random.sample(range(len(clusters)), n_user_displayed)
+#     return [clusters[i] for i in selected_indices], [questions[i] for i in selected_indices]
+
+
+def get_id_clusters(data, n_user_displayed=5, n_points_displayed=10) :
     """Give the id of NUMBER_OF_CLUSTERS_DISPLAYED targeted chunks cluster using the SEED, """
     clusters = []
     questions : list[str] = []
-    for chunk in data:
-        cluster = []
-        questions.append(chunk.get("question", ""))
-        for targeted_chunk in chunk.get("targeted_chunk", []):
-            cluster.append(f'{targeted_chunk.split("|")[0]}|{targeted_chunk[-2]}|{targeted_chunk[-1]}')
-        clusters.append(cluster)
-    selected_indices = random.sample(range(len(clusters)), n_user_displayed)
-    return [clusters[i] for i in selected_indices], [questions[i] for i in selected_indices]
-            
+    grouped_data = defaultdict(list)
+    for item in data:
+        key = item["user_number"]
+        grouped_data[key].append(item["targeted_chunk"])
+    grouped_data= [sum(grouped_data[key], []) for key in grouped_data.keys()]
+    selected_indices = random.sample(range(len(grouped_data)), n_user_displayed)
+    return [grouped_data[i][0:n_points_displayed] for i in selected_indices]
+
+    # for chunk in data:
+    #     cluster = []
+    #     questions.append(chunk.get("question", ""))
+    #     for targeted_chunk in chunk.get("targeted_chunk", []):
+    #         cluster.append(f'{targeted_chunk.split("|")[0]}|{targeted_chunk[-2]}|{targeted_chunk[-1]}')
+    #     clusters.append(cluster)
+    # selected_indices = random.sample(range(len(clusters)), n_user_displayed)
+    # return [clusters[i] for i in selected_indices], [questions[i] for i in selected_indices]
+
+
+
+
+
 def fetch_embeddings(
     collection_path: str,
     collection_name: str,
@@ -72,7 +98,7 @@ def fetch_embeddings(
     embeddings = []
     for chunk_id in chunk_ids:
         # Parse chunk_id (format: "triplet_index|document_id|phrase_seq")
-        triplet_index, document_id, phrase_seq = str(chunk_id.split("|"))
+        triplet_index, document_id, phrase_seq = chunk_id.split("|")
 
         
         chroma_id = f"{triplet_index}_{document_id}_{phrase_seq}"

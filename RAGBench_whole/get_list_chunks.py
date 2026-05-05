@@ -9,11 +9,11 @@ list_chunks_id = []
 for item in data:
     id_triplets = item['id_triplets']
     for documents in item['sentences']:
-        for document in documents:
-            document_id = document[0][0]
-            phrase_seq = document[0][1]
-            id_chunks = f"{id_triplets}|{document_id}|{phrase_seq}"
-            list_chunks_id.append(id_chunks)
+        # for document in documents:
+        document_id = documents[0][0]
+        phrase_seq = documents[0][-1]
+        id_chunks = f"{id_triplets}|{document_id}|{phrase_seq}"
+        list_chunks_id.append(id_chunks)
 
 # store the json
 with open('RAGBench_whole/list_chunks_id.json', 'w') as f:

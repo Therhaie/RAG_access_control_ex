@@ -25,7 +25,7 @@ from query_pipeline import BGE_QUERY_PREFIX
 from plot_PCA import get_all_chunk_ids, get_list_id_targeted_chunk
 
 # --- Constants (configurable via CLI) ---
-LOGS_DIR = Path("logs")
+LOGS_DIR = Path(os.path.join(os.getcwd(), "logs"))
 RESULTS_DIR = Path(os.path.join(os.getcwd(), "results_experiment"))
 GT_FILE = Path("RAGBench_whole/merged_id_triplets_with_metadata2.json")
 PATH_TIME_DATABASE_CREATION = Path("time_database_creation.jsonl")
@@ -66,6 +66,7 @@ ORIGINAL_CHROMA = os.path.join(os.getcwd(), "./experiment_chroma_db")
 ORIGINAL_COLLECTION = "experimental_baseline_db"
 AUG_CHROMA_BASE = os.path.join(os.getcwd(), "./chroma_extra_dim_experiment")
 AUGMENTED_NAME = f"augmented_db{DISTANCE_METRIC}val_query_half{DEFAULT_LARGE_VAL}{NUMBER_CLUSTER}"
+print(f"Augmented collection name: {AUGMENTED_NAME}")
 META_CHROMA_BASE = os.path.join(os.getcwd(), "./chroma_meta_db_experiment")
 META_NAME = "meta_access_control_experiment"
 ROTATED_CHROMA = os.path.join(os.getcwd(), "./chroma_rotated_db_log")
@@ -275,14 +276,14 @@ def _get_client(path: str) -> chromadb.PersistentClient:
     os.makedirs(path, exist_ok=True)
     return chromadb.PersistentClient(path=path, settings=Settings(anonymized_telemetry=False))
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-def _upsert_batch(collection, batch_ids: List[str], batch_embeddings: List, batch_documents: List, batch_metadatas: List) -> None:
-    collection.upsert(
-        ids=batch_ids,
-        embeddings=batch_embeddings,
-        documents=batch_documents,
-        metadatas=batch_metadatas
-    )
+# @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+# def _upsert_batch(collection, batch_ids: List[str], batch_embeddings: List, batch_documents: List, batch_metadatas: List) -> None:
+#     collection.upsert(
+#         ids=batch_ids,
+#         embeddings=batch_embeddings,
+#         documents=batch_documents,
+#         metadatas=batch_metadatas
+#     )
 
 def _get_original_collection(path: str, name: str):
     return _get_client(path).get_collection(name=name)
@@ -355,6 +356,9 @@ def _build_aug_record(
     orig_collection,
     aug_collection,
 ) -> int:
+    user_index = record["user_number"]
+    if user_index != query_index:
+        print(f"Warning: user_index {user_index} does not match query_index {query_index} for record with triplet_index {record.get('id_triplets')}")
     triplet_index = record["id_triplets"]
     stable_chunks = record["targeted_chunk"]
     batch_ids, batch_embeddings, batch_documents, batch_metadatas = [], [], [], []
@@ -419,7 +423,7 @@ def build_aug_db_parallel(
             )
         for future in as_completed(futures):
             future.result()
-    logger.info("✅ Augmented DB build complete")
+    logger.info(f"✅ Augmented DB build complete : {AUGMENTED_NAME}")
 
 def _process_aug_untargeted_batch(
     batch: List[str],

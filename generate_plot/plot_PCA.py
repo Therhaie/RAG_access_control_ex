@@ -31,13 +31,13 @@ SEED = 42  # For reproducibility
 DATA_PATH = os.path.join(os.getcwd(), "RAGBench_whole", "merged_id_triplets_with_metadata2.json")
 
 COLLECTION_NAME_ROTATION = "rotated_experiment"
-DIRECTORY_ROTATION_DB =  os.path.join(os.getcwd(), "./chroma_rotated_db")
+DIRECTORY_ROTATION_DB =  os.path.join(os.getcwd(), "./chroma_rotated_db_log")
 
-COLLECTION_NAME_AUGMENTED ="augmented_db_norm_1000000000.0" # low value encode access control # "augmented_db_1000.0" large value encode security #"augmented_db"
-DIRECTORY_AUGMENTED_DB = os.path.join(os.getcwd(), "./chroma_aug_db")
+COLLECTION_NAME_AUGMENTED = "augmented_dbcosineval_query_half10.020_q20_lv1e01_lvq1e01_na1" #"augmented_dbcosineval_query_half10.020" # low value encode access control # "augmented_db_1000.0" large value encode security #"augmented_db"
+DIRECTORY_AUGMENTED_DB = os.path.join(os.getcwd(), "./chroma_extra_dim_experiment")
 
-COLLECTION_NAME_BASELINE = "baseline_db"
-DIRECTORY_BASELINE_DB = os.path.join(os.getcwd(), "./chroma_db")
+COLLECTION_NAME_BASELINE = "experimental_baseline_db"
+DIRECTORY_BASELINE_DB = os.path.join(os.getcwd(), "./experiment_chroma_db")
 
 SAVE_DIR = os.path.join(os.getcwd(), "plots")
 
@@ -57,9 +57,10 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Embedding cluster visualization experiment control.")
     parser.add_argument("--seed", type=int, default=SEED, help="Random seed for reproducibility.")
     parser.add_argument("--num-clusters", type=int, default=NUMBER_OF_CLUSTERS_DISPLAYED, help="Number of clusters to display.")
+    parser.add_argument("--num-untargeted", type=int, default=NUMBER_OF_UNTARGETED_CHUNKS_DISPLAYED, help="Number of untargeted chunks to display.")
 
-    parser.add_argument("--collection-name", type=str, default=COLLECTION_NAME_AUGMENTED, help="Name of the ChromaDB collection to use.")
-    parser.add_argument("--collection-dir", type=str, default=DIRECTORY_AUGMENTED_DB, help="Directory path where the ChromaDB collection is stored.")
+    parser.add_argument("--collection-name", type=str, default=COLLECTION_NAME_BASELINE, help="Name of the ChromaDB collection to use.")
+    parser.add_argument("--collection-dir", type=str, default=DIRECTORY_BASELINE_DB, help="Directory path where the ChromaDB collection is stored.")
     parser.add_argument("--plot-title", dest='plot_title', action='store_true', help="Include plot title text.")
     parser.add_argument("--no-plot-title", dest='plot_title', action='store_false', help="Omit plot title text.")
     parser.set_defaults(plot_title=True)
@@ -69,12 +70,12 @@ def parse_args():
     parser.set_defaults(show_legend=True)
 
     parser.add_argument("--show-centers", dest='plot_centers', action='store_true', help="Display centers of each cluster.")
-    parser.add_argument("--hide-centers", dest='plot_centers', action='store_false', help="Do not display centers.")
+    parser.add_argument("--hide-centers", dest='plot_centers', default=False, help="Do not display centers.")
     parser.set_defaults(plot_centers=True)
 
-    parser.add_argument("--show-center-distances", dest="show_center_distances", action="store_true", help="Display distances between centers (cosine similarity).")
+    parser.add_argument("--show-center-distances", dest="show_center_distances", default=False, help="Display distances between centers (cosine similarity).")
     parser.add_argument("--hide-center-distances", dest="show_center_distances", action="store_false", help="Do not display distances between centers.")
-    parser.set_defaults(show_center_distances=True)
+    parser.set_defaults(show_center_distances=False)
 
     parser.add_argument('--methods', type=str, nargs='+', default=['pca'], choices=["pca", "umap", "tsne", "all"],
                         help="Which reduction methods to use ('pca', 'umap', 'tsne', or 'all'). Default: pca")
@@ -227,6 +228,7 @@ def plot_pca(
 
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        print(f"Plot saved to {save_path}")
     plt.show()
 
 # Replace the usage block
@@ -239,10 +241,10 @@ if __name__ == "__main__":
     with open(DATA_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    list_of_chunk_ids = get_all_chunk_ids(data)
-    list_of_targeted_chunk_ids = get_list_id_targeted_chunk(data)
-    list_of_untargeted_chunk_ids = get_id_untargeted_chunk(data)
-    list_of_cluster_ids, questions = get_id_clusters(data)
+    # list_of_chunk_ids = get_all_chunk_ids(data)
+    # list_of_targeted_chunk_ids = get_list_id_targeted_chunk(data, )
+    list_of_untargeted_chunk_ids = get_id_untargeted_chunk(data, n_untargeted_chunks_displayed=args.num_untargeted)
+    list_of_cluster_ids = get_id_clusters(data, n_user_displayed=args.num_clusters, n_points_displayed=args.num_untargeted)
     list_of_cluster_embeddings = []
     for e in list_of_cluster_ids:
         embedding = fetch_embeddings(
@@ -263,7 +265,8 @@ if __name__ == "__main__":
 
     methods = ["pca", "umap", "tsne"] if "all" in args.methods else args.methods
     for method in methods:
-        save_path = os.path.join(SAVE_DIR, f"{method}_clusters.png")
+        save_path = os.path.join(SAVE_DIR, "PCA", f"{method}_clusters.pdf")
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plot_pca(
             list_of_cluster_embeddings,
             title=f"Clusters representation using {method.upper()}, seed : {SEED}" if args.plot_title else "",
