@@ -15,3 +15,5 @@ venv/
 *.jsonl
 *.json
 *.log
+*.pdf
+aaa_plot.py

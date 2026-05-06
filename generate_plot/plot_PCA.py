@@ -59,8 +59,11 @@ def parse_args():
     parser.add_argument("--num-clusters", type=int, default=NUMBER_OF_CLUSTERS_DISPLAYED, help="Number of clusters to display.")
     parser.add_argument("--num-untargeted", type=int, default=NUMBER_OF_UNTARGETED_CHUNKS_DISPLAYED, help="Number of untargeted chunks to display.")
 
-    parser.add_argument("--collection-name", type=str, default=COLLECTION_NAME_BASELINE, help="Name of the ChromaDB collection to use.")
-    parser.add_argument("--collection-dir", type=str, default=DIRECTORY_BASELINE_DB, help="Directory path where the ChromaDB collection is stored.")
+    parser.add_argument("--collection-name", type=str, nargs='+', default=[COLLECTION_NAME_BASELINE, COLLECTION_NAME_ROTATION, COLLECTION_NAME_AUGMENTED], help="Name of the ChromaDB collection to use. Defaults to baseline, rotation, and augmented collection names.")
+    
+    parser.add_argument("--collection-dir", type=str, nargs='+', default=[DIRECTORY_BASELINE_DB, DIRECTORY_ROTATION_DB, DIRECTORY_AUGMENTED_DB], help="Directory path where the ChromaDB collection is stored. Defaults to baseline, rotation, and augmented directories.")
+
+
     parser.add_argument("--plot-title", dest='plot_title', action='store_true', help="Include plot title text.")
     parser.add_argument("--no-plot-title", dest='plot_title', action='store_false', help="Omit plot title text.")
     parser.set_defaults(plot_title=True)
@@ -246,36 +249,47 @@ if __name__ == "__main__":
     list_of_untargeted_chunk_ids = get_id_untargeted_chunk(data, n_untargeted_chunks_displayed=args.num_untargeted)
     list_of_cluster_ids = get_id_clusters(data, n_user_displayed=args.num_clusters, n_points_displayed=args.num_untargeted)
     list_of_cluster_embeddings = []
-    for e in list_of_cluster_ids:
-        embedding = fetch_embeddings(
-            collection_path=args.collection_dir,
-            collection_name=args.collection_name,
-            chunk_ids=[e][0],
+    collections_name = args.collection_name
+    collections_dir = args.collection_dir
+
+    for collection_dir, collection_name in zip(collections_dir, collections_name):
+        for e in list_of_cluster_ids:
+            # embedding = fetch_embeddings(
+            #     collection_path=args.collection_dir,
+            #     collection_name=args.collection_name,
+            #     chunk_ids=[e][0],
+            #     is_rotated=False,
+            # )
+            # list_of_cluster_embeddings.append(embedding)
+            embedding = fetch_embeddings(
+                collection_path=collection_dir,
+                collection_name=collection_name,
+                chunk_ids=[e][0],
+                is_rotated=False,
+            )
+            list_of_cluster_embeddings.append(embedding)
+
+        list_of_targeted_chunk_embeddings = fetch_embeddings(
+            collection_path=collection_dir,
+            collection_name=collection_name,
+            chunk_ids=list_of_untargeted_chunk_ids,
             is_rotated=False,
         )
-        list_of_cluster_embeddings.append(embedding)
+        list_of_cluster_embeddings.append(list_of_targeted_chunk_embeddings)
 
-    list_of_targeted_chunk_embeddings = fetch_embeddings(
-        collection_path=args.collection_dir,
-        collection_name=args.collection_name,
-        chunk_ids=list_of_untargeted_chunk_ids,
-        is_rotated=False,
-    )
-    list_of_cluster_embeddings.append(list_of_targeted_chunk_embeddings)
-
-    methods = ["pca", "umap", "tsne"] if "all" in args.methods else args.methods
-    for method in methods:
-        save_path = os.path.join(SAVE_DIR, "PCA", f"{method}_clusters.pdf")
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plot_pca(
-            list_of_cluster_embeddings,
-            title=f"Clusters representation using {method.upper()}, seed : {SEED}" if args.plot_title else "",
-            n_components=2,
-            n_clusters_displayed=args.num_clusters,
-            method=method,
-            save_path=save_path,
-            plot_centers=args.plot_centers,
-            show_legend=args.show_legend,
-            show_center_distances=args.show_center_distances  # new flag
-            # Pass embed_questions arg if you wish
-        )
+        methods = ["pca", "umap", "tsne"] if "all" in args.methods else args.methods
+        for method in methods:
+            save_path = os.path.join(SAVE_DIR, "PCA", f"{method}_clusters.pdf")
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plot_pca(
+                list_of_cluster_embeddings,
+                title=f"Clusters representation using {method.upper()}, seed : {SEED}" if args.plot_title else "",
+                n_components=2,
+                n_clusters_displayed=args.num_clusters,
+                method=method,
+                save_path=save_path,
+                plot_centers=args.plot_centers,
+                show_legend=args.show_legend,
+                show_center_distances=args.show_center_distances  # new flag
+                # Pass embed_questions arg if you wish
+            )
